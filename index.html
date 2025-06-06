@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Photo Booth with Live & Animated Filters</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #000;
+        }
+        video, #overlay-canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        #overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        video {
+            transition: filter 0.3s ease-in-out;
+        }
+        button, select, label {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            vertical-align: middle;
+        }
+        button:hover, select:hover {
+            background-color: #0056b3;
+        }
+        button:disabled, select:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #output-image {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+            transition: transform 0.3s ease-in-out;
+        }
+        .flipped {
+            transform: scaleX(-1);
+        }
+        #error-message {
+            color: red;
+            margin-top: 10px;
+        }
+        #photo-canvas {
+            display: none;
+        }
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .checkbox-container:hover {
+            background-color: #0056b3;
+        }
+        .checkbox-container input[type="checkbox"] {
+            margin-right: 8px;
+            width: 18px;
+            height: 18px;
+        }
+        .checkbox-container.disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .checkbox-container.disabled input[type="checkbox"] {
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Camera Photo Booth with Filters & Animations</h1>
+
+        <div class="video-wrapper">
+            <video id="video-stream" autoplay playsinline></video>
+            <canvas id="overlay-canvas"></canvas>
+        </div>
+
+        <div class="controls-row">
+            <button id="start-camera">Start Camera</button>
+            <button id="stop-camera" disabled>Stop Camera</button>
+            <button id="take-photo" disabled>Take Photo</button>
+        </div>
+        <div class="controls-row">
+            <label for="live-filter-select">Live Video Filter:</label>
+            <select id="live-filter-select" disabled>
+                <option value="none">None</option>
+                <option value="grayscale(100%)">Grayscale</option>
+                <option value="sepia(100%)">Sepia</option>
+                <option value="invert(100%)">Invert</option>
+                <option value="brightness(150%)">Brighter</option>
+                <option value="contrast(200%)">High Contrast</option>
+                <option value="saturate(200%)">High Saturation</option>
+            </select>
+        </div>
+        <div class="controls-row">
+            <label class="checkbox-container" id="bubble-animation-label">
+                <input type="checkbox" id="bubble-animation-toggle" disabled>
+                Flying Bubbles
+            </label>
+            <label class="checkbox-container" id="heart-animation-label">
+                <input type="checkbox" id="heart-animation-toggle" disabled>
+                Falling Hearts
+            </label>
+        </div>
+        <div class="controls-row">
+            <label for="post-capture-filter-select">Post-Capture Filter:</label>
+            <select id="post-capture-filter-select" disabled>
+                <option value="none">No Filter</option>
+                <option value="grayscale">Grayscale</option>
+                <option value="sepia">Sepia</option>
+                <option value="brightness">Brightness (+20%)</option>
+                <option value="contrast">Contrast (+20%)</option>
+                <option value="saturation">Saturation (+50%)</option>
+                <option value="vintage">Vintage</option>
+            </select>
+            <button id="flip-photo" disabled>Flip Photo</button>
+            <button id="clear-photo" disabled>Clear Photo</button>
+        </div>
+
+        <p id="error-message"></p>
+
+        <h2>Captured Photo:</h2>
+        <img id="output-image" alt="Captured Photo">
+    </div>
+
+    <canvas id="photo-canvas"></canvas>
+
+    <script>
+        const videoStream = document.getElementById('video-stream');
+        const startCameraButton = document.getElementById('start-camera');
+        const stopCameraButton = document.getElementById('stop-camera');
+        const takePhotoButton = document.getElementById('take-photo');
+        const flipPhotoButton = document.getElementById('flip-photo');
+        const clearPhotoButton = document.getElementById('clear-photo');
+        const liveFilterSelect = document.getElementById('live-filter-select');
+        const postCaptureFilterSelect = document.getElementById('post-capture-filter-select');
+        const bubbleAnimationToggle = document.getElementById('bubble-animation-toggle');
+        const bubbleAnimationLabel = document.getElementById('bubble-animation-label');
+        const heartAnimationToggle = document.getElementById('heart-animation-toggle'); // New element
+        const heartAnimationLabel = document.getElementById('heart-animation-label'); // New element
+        const outputImage = document.getElementById('output-image');
+        const photoCanvas = document.getElementById('photo-canvas');
+        const errorMessage = document.getElementById('error-message');
+        const context = photoCanvas.getContext('2d');
+
+        const overlayCanvas = document.getElementById('overlay-canvas');
+        const overlayContext = overlayCanvas.getContext('2d');
+
+        let stream;
+        let isFlipped = false;
+        let originalImageDataURL = '';
+        let animationFrameId; // Single ID for the main animation loop
+        const bubbles = [];
+        const hearts = []; // New array for hearts
+
+        // --- Shared Animation Loop Logic ---
+        function animateOverlay() {
+            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height); // Clear canvas once per frame
+
+            // Update and draw bubbles if active
+            if (bubbleAnimationToggle.checked) {
+                for (let i = bubbles.length - 1; i >= 0; i--) {
+                    if (bubbles[i].update()) {
+                        bubbles[i].draw(overlayContext);
+                    } else {
+                        bubbles.splice(i, 1);
+                    }
+                }
+                if (Math.random() < 0.1) { // Adjust frequency
+                    createBubble();
+                }
+            }
+
+            // Update and draw hearts if active
+            if (heartAnimationToggle.checked) {
+                for (let i = hearts.length - 1; i >= 0; i--) {
+                    if (hearts[i].update()) {
+                        hearts[i].draw(overlayContext);
+                    } else {
+                        hearts.splice(i, 1);
+                    }
+                }
+                if (Math.random() < 0.05) { // Adjust frequency
+                    createHeart();
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(animateOverlay); // Loop
+        }
+
+        function startOverlayAnimation() {
+            if (!animationFrameId) { // Start only if not already running
+                overlayCanvas.width = videoStream.videoWidth;
+                overlayCanvas.height = videoStream.videoHeight;
+                // Clear all particles when animation starts
+                bubbles.length = 0;
+                hearts.length = 0;
+                animateOverlay();
+            }
+        }
+
+        function stopOverlayAnimation() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+                overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                bubbles.length = 0;
+                hearts.length = 0;
+            }
+        }
+
+        // --- Bubble Animation Class & Creator ---
+        class Bubble {
+            constructor(x, y, radius, color, speedY) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.speedY = speedY;
+                this.opacity = 1.0;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity * 0.7})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            update() {
+                this.y += this.speedY;
+                this.opacity -= 0.005;
+                return this.opacity > 0;
+            }
+        }
+
+        function createBubble() {
+            const x = Math.random() * overlayCanvas.width;
+            const y = overlayCanvas.height + 20;
+            const radius = Math.random() * 10 + 5;
+            const color = `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.8)`;
+            const speedY = -(Math.random() * 1 + 0.5);
+            bubbles.push(new Bubble(x, y, radius, color, speedY));
+        }
+
+        // --- Heart Animation Class & Creator (NEW) ---
+        class Heart {
+            constructor(x, y, size, color, speedY, rotation) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.color = color;
+                this.speedY = speedY;
+                this.opacity = 1.0;
+                this.rotation = rotation; // Initial rotation
+                this.rotationSpeed = (Math.random() - 0.5) * 0.05; // Small random rotation speed
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(0, this.size / 4);
+                ctx.bezierCurveTo(this.size / 2, -this.size / 2, this.size, 0, 0, this.size);
+                ctx.bezierCurveTo(-this.size, 0, -this.size / 2, -this.size / 2, 0, this.size / 4);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            update() {
+                this.y += this.speedY;
+                this.opacity -= 0.008; // Fade out faster
+                this.rotation += this.rotationSpeed;
+                return this.opacity > 0;
+            }
+        }
+
+        function createHeart() {
+            const x = Math.random() * overlayCanvas.width;
+            const y = -20; // Start above the canvas
+            const size = Math.random() * 15 + 10; // 10 to 25 pixels
+            const color = `rgba(255, ${Math.floor(Math.random() * 100)}, ${Math.floor(Math.random() * 100)}, 0.9)`; // Reddish hues
+            const speedY = Math.random() * 1 + 0.5; // Move downwards, 0.5 to 1.5 pixels/frame
+            const rotation = Math.random() * Math.PI * 2; // Random initial rotation
+            hearts.push(new Heart(x, y, size, color, speedY, rotation));
+        }
+        // --- End Heart Animation Logic ---
+
+
+        // --- Helper function to apply CSS filter equivalents to pixel data ---
+        function applyCSSFilterEquivalentToPixels(pixels, cssFilterString) {
+            const match = cssFilterString.match(/(\w+)\(([^)]+)\)/);
+            if (!match) return;
+
+            const filterType = match[1];
+            let value = parseFloat(match[2]);
+            if (match[2].includes('%')) value /= 100;
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                let r = pixels[i];
+                let g = pixels[i + 1];
+                let b = pixels[i + 2];
+
+                let newR = r, newG = g, newB = b;
+
+                switch (filterType) {
+                    case 'grayscale':
+                        let avg = (r + g + b) / 3;
+                        newR = avg * value;
+                        newG = avg * value;
+                        newB = avg * value;
+                        break;
+                    case 'sepia':
+                        if (value === 1) {
+                            newR = (r * 0.393) + (g * 0.769) + (b * 0.189);
+                            newG = (r * 0.349) + (g * 0.686) + (b * 0.168);
+                            newB = (r * 0.272) + (g * 0.534) + (b * 0.131);
+                        }
+                        break;
+                    case 'invert':
+                        newR = 255 - r;
+                        newG = 255 - g;
+                        newB = 255 - b;
+                        break;
+                    case 'brightness':
+                        newR = r * value;
+                        newG = g * value;
+                        newB = b * value;
+                        break;
+                    case 'contrast':
+                        newR = ((r / 255 - 0.5) * value + 0.5) * 255;
+                        newG = ((g / 255 - 0.5) * value + 0.5) * 255;
+                        newB = ((b / 255 - 0.5) * value + 0.5) * 255;
+                        break;
+                    case 'saturate':
+                        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+                        newR = luma + value * (r - luma);
+                        newG = luma + value * (g - luma);
+                        newB = luma + value * (b - luma);
+                        break;
+                    case 'hue-rotate':
+                    case 'blur':
+                        // Not implemented for pixel manipulation capture
+                        break;
+                }
+                pixels[i] = Math.min(255, Math.max(0, newR));
+                pixels[i + 1] = Math.min(255, Math.max(0, newG));
+                pixels[i + 2] = Math.min(255, Math.max(0, newB));
+            }
+        }
+
+        // --- Utility Functions for Post-Capture Filters (Pixel Manipulation) ---
+        function applyPostCaptureFilter(filterType) {
+            if (!originalImageDataURL) return;
+
+            const img = new Image();
+            img.onload = () => {
+                photoCanvas.width = img.width;
+                photoCanvas.height = img.height;
+                context.drawImage(img, 0, 0);
+
+                const imageData = context.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
+                const pixels = imageData.data;
+
+                for (let i = 0; i < pixels.length; i += 4) {
+                    let r = pixels[i];
+                    let g = pixels[i + 1];
+                    let b = pixels[i + 2];
+
+                    let newR = r, newG = g, newB = b;
+
+                    switch (filterType) {
+                        case 'grayscale':
+                            let avg = (r + g + b) / 3;
+                            newR = avg;
+                            newG = avg;
+                            newB = avg;
+                            break;
+                        case 'sepia':
+                            newR = (r * 0.393) + (g * 0.769) + (b * 0.189);
+                            newG = (r * 0.349) + (g * 0.686) + (b * 0.168);
+                            newB = (r * 0.272) + (g * 0.534) + (b * 0.131);
+                            break;
+                        case 'brightness':
+                            const brightness = 20;
+                            newR = r + brightness;
+                            newG = g + brightness;
+                            newB = b + brightness;
+                            break;
+                        case 'contrast':
+                            const contrast = 1.2;
+                            newR = ((r / 255 - 0.5) * contrast + 0.5) * 255;
+                            newG = ((g / 255 - 0.5) * contrast + 0.5) * 255;
+                            newB = ((b / 255 - 0.5) * contrast + 0.5) * 255;
+                            break;
+                        case 'saturation':
+                            const saturation = 1.5;
+                            const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+                            newR = luma + saturation * (r - luma);
+                            newG = luma + saturation * (g - luma);
+                            newB = luma + saturation * (b - luma);
+                            break;
+                        case 'vintage':
+                            let r_sepia = (r * 0.393) + (g * 0.769) + (b * 0.189);
+                            let g_sepia = (r * 0.349) + (g * 0.686) + (b * 0.168);
+                            let b_sepia = (r * 0.272) + (g * 0.534) + (b * 0.131);
+
+                            const vintageContrast = 1.1;
+                            const vintageBrightness = -10;
+                            newR = ((r_sepia / 255 - 0.5) * vintageContrast + 0.5) * 255 + vintageBrightness;
+                            newG = ((g_sepia / 255 - 0.5) * vintageContrast + 0.5) * 255 + vintageBrightness;
+                            newB = ((b_sepia / 255 - 0.5) * vintageContrast + 0.5) * 255 + vintageBrightness;
+                            break;
+                        case 'none':
+                        default:
+                            break;
+                    }
+
+                    pixels[i] = Math.min(255, Math.max(0, newR));
+                    pixels[i + 1] = Math.min(255, Math.max(0, newG));
+                    pixels[i + 2] = Math.min(255, Math.max(0, newB));
+                }
+
+                context.putImageData(imageData, 0, 0);
+                outputImage.src = photoCanvas.toDataURL('image/png');
+                if (isFlipped) {
+                    outputImage.classList.add('flipped');
+                } else {
+                    outputImage.classList.remove('flipped');
+                }
+            };
+            img.src = originalImageDataURL;
+        }
+
+        // --- Event Listeners ---
+
+        startCameraButton.addEventListener('click', async () => {
+            errorMessage.textContent = '';
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        facingMode: "user"
+                    }
+                });
+
+                videoStream.srcObject = stream;
+                await videoStream.play();
+
+                const videoAspectRatio = videoStream.videoHeight / videoStream.videoWidth;
+                document.querySelector('.video-wrapper').style.height = `${videoStream.offsetWidth * videoAspectRatio}px`;
+                overlayCanvas.width = videoStream.videoWidth;
+                overlayCanvas.height = videoStream.videoHeight;
+
+
+                console.log(`Actual video resolution: ${videoStream.videoWidth}x${videoStream.videoHeight}`);
+
+                startCameraButton.disabled = true;
+                stopCameraButton.disabled = false;
+                takePhotoButton.disabled = false;
+                liveFilterSelect.disabled = false;
+                bubbleAnimationToggle.disabled = false;
+                bubbleAnimationLabel.classList.remove('disabled');
+                heartAnimationToggle.disabled = false; // Enable heart animation toggle
+                heartAnimationLabel.classList.remove('disabled'); // Enable heart animation label
+                postCaptureFilterSelect.disabled = true;
+                flipPhotoButton.disabled = true;
+                clearPhotoButton.disabled = true;
+
+                videoStream.style.filter = 'none';
+                outputImage.style.display = 'none';
+                outputImage.src = '';
+                originalImageDataURL = '';
+                outputImage.classList.remove('flipped');
+                isFlipped = false;
+                liveFilterSelect.value = 'none';
+                postCaptureFilterSelect.value = 'none';
+                bubbleAnimationToggle.checked = false;
+                heartAnimationToggle.checked = false; // Ensure heart animation is off initially
+                stopOverlayAnimation(); // Stop any leftover animation
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                if (err.name === 'NotAllowedError') {
+                    errorMessage.textContent = 'Error: Camera access denied. Please grant permission in your browser settings.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMessage.textContent = 'Error: No camera found on your device.';
+                } else if (err.name === 'OverconstrainedError') {
+                    errorMessage.textContent = 'Error: Your camera does not support the requested resolution. Trying a lower resolution might help.';
+                } else {
+                    errorMessage.textContent = `Error: Could not access camera. ${err.message}`;
+                }
+                startCameraButton.disabled = false;
+                stopCameraButton.disabled = true;
+                takePhotoButton.disabled = true;
+                liveFilterSelect.disabled = true;
+                bubbleAnimationToggle.disabled = true;
+                bubbleAnimationLabel.classList.add('disabled');
+                heartAnimationToggle.disabled = true; // Disable heart animation toggle
+                heartAnimationLabel.classList.add('disabled'); // Disable heart animation label
+                postCaptureFilterSelect.disabled = true;
+                flipPhotoButton.disabled = true;
+                clearPhotoButton.disabled = true;
+            }
+        });
+
+        stopCameraButton.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoStream.srcObject = null;
+                stream = null;
+
+                startCameraButton.disabled = false;
+                stopCameraButton.disabled = true;
+                takePhotoButton.disabled = true;
+                liveFilterSelect.disabled = true;
+                bubbleAnimationToggle.disabled = true;
+                bubbleAnimationLabel.classList.add('disabled');
+                heartAnimationToggle.disabled = true; // Disable heart animation toggle
+                heartAnimationLabel.classList.add('disabled'); // Disable heart animation label
+                postCaptureFilterSelect.disabled = true;
+                flipPhotoButton.disabled = true;
+                clearPhotoButton.disabled = true;
+
+                videoStream.style.filter = 'none';
+                outputImage.src = '';
+                outputImage.style.display = 'none';
+                originalImageDataURL = '';
+                outputImage.classList.remove('flipped');
+                isFlipped = false;
+                liveFilterSelect.value = 'none';
+                postCaptureFilterSelect.value = 'none';
+                bubbleAnimationToggle.checked = false;
+                heartAnimationToggle.checked = false; // Ensure heart animation is off
+                stopOverlayAnimation(); // Ensure animation is stopped
+            }
+        });
+
+        takePhotoButton.addEventListener('click', () => {
+            if (stream) {
+                photoCanvas.width = videoStream.videoWidth;
+                photoCanvas.height = videoStream.videoHeight;
+
+                // 1. Draw the raw video frame to the photo-canvas
+                context.drawImage(videoStream, 0, 0, photoCanvas.width, photoCanvas.height);
+
+                // 2. If animations are enabled, draw the current state of the overlay canvas on top
+                if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
+                    context.drawImage(overlayCanvas, 0, 0, photoCanvas.width, photoCanvas.height);
+                }
+
+                // 3. Apply the *active live CSS filter's equivalent* to the photo-canvas's pixels
+                const currentLiveFilter = liveFilterSelect.value;
+                if (currentLiveFilter !== 'none') {
+                    const imageData = context.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
+                    applyCSSFilterEquivalentToPixels(imageData.data, currentLiveFilter);
+                    context.putImageData(imageData, 0, 0);
+                }
+
+                // Store the result (now includes live filter and animations)
+                originalImageDataURL = photoCanvas.toDataURL('image/png');
+
+                // Display the image
+                outputImage.src = originalImageDataURL;
+                outputImage.style.display = 'block';
+
+                clearPhotoButton.disabled = false;
+                flipPhotoButton.disabled = false;
+                postCaptureFilterSelect.disabled = false;
+                takePhotoButton.disabled = true;
+            }
+        });
+
+        flipPhotoButton.addEventListener('click', () => {
+            isFlipped = !isFlipped;
+            if (isFlipped) {
+                outputImage.classList.add('flipped');
+            } else {
+                outputImage.classList.remove('flipped');
+            }
+        });
+
+        clearPhotoButton.addEventListener('click', () => {
+            outputImage.src = '';
+            outputImage.style.display = 'none';
+            originalImageDataURL = '';
+            outputImage.classList.remove('flipped');
+            isFlipped = false;
+            postCaptureFilterSelect.value = 'none';
+
+            takePhotoButton.disabled = false;
+            clearPhotoButton.disabled = true;
+            flipPhotoButton.disabled = true;
+            postCaptureFilterSelect.disabled = true;
+        });
+
+        liveFilterSelect.addEventListener('change', (event) => {
+            videoStream.style.filter = event.target.value;
+        });
+
+        // Toggle the main animation loop based on any animation being active
+        function updateAnimationState() {
+            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
+                startOverlayAnimation();
+            } else {
+                stopOverlayAnimation();
+            }
+        }
+        bubbleAnimationToggle.addEventListener('change', updateAnimationState);
+        heartAnimationToggle.addEventListener('change', updateAnimationState); // New event listener
+
+        postCaptureFilterSelect.addEventListener('change', (event) => {
+            applyPostCaptureFilter(event.target.value);
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            stopOverlayAnimation();
+        });
+
+        videoStream.addEventListener('loadedmetadata', () => {
+            document.querySelector('.video-wrapper').style.height = `${videoStream.offsetWidth * (videoStream.videoHeight / videoStream.videoWidth)}px`;
+            overlayCanvas.width = videoStream.videoWidth;
+            overlayCanvas.height = videoStream.videoHeight;
+            // If any animation is currently checked, restart the loop to apply new dimensions
+            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
+                stopOverlayAnimation(); // Stop and then restart to ensure new dimensions are picked up
+                startOverlayAnimation();
+            }
+        });
+    </script>
+</body>
+</html>
+
