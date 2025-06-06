@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera Photo Booth with Live & Animated Filters</title>
+    <title>Camera Photo Booth with Camera Switch</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -135,6 +135,11 @@
         </div>
 
         <div class="controls-row">
+            <label for="camera-select">Camera:</label>
+            <select id="camera-select">
+                <option value="user">Front Camera</option>
+                <option value="environment">Rear Camera</option>
+            </select>
             <button id="start-camera">Start Camera</button>
             <button id="stop-camera" disabled>Stop Camera</button>
             <button id="take-photo" disabled>Take Photo</button>
@@ -195,8 +200,9 @@
         const postCaptureFilterSelect = document.getElementById('post-capture-filter-select');
         const bubbleAnimationToggle = document.getElementById('bubble-animation-toggle');
         const bubbleAnimationLabel = document.getElementById('bubble-animation-label');
-        const heartAnimationToggle = document.getElementById('heart-animation-toggle'); // New element
-        const heartAnimationLabel = document.getElementById('heart-animation-label'); // New element
+        const heartAnimationToggle = document.getElementById('heart-animation-toggle');
+        const heartAnimationLabel = document.getElementById('heart-animation-label');
+        const cameraSelect = document.getElementById('camera-select'); // New element
         const outputImage = document.getElementById('output-image');
         const photoCanvas = document.getElementById('photo-canvas');
         const errorMessage = document.getElementById('error-message');
@@ -208,15 +214,14 @@
         let stream;
         let isFlipped = false;
         let originalImageDataURL = '';
-        let animationFrameId; // Single ID for the main animation loop
+        let animationFrameId;
         const bubbles = [];
-        const hearts = []; // New array for hearts
+        const hearts = [];
 
         // --- Shared Animation Loop Logic ---
         function animateOverlay() {
-            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height); // Clear canvas once per frame
+            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-            // Update and draw bubbles if active
             if (bubbleAnimationToggle.checked) {
                 for (let i = bubbles.length - 1; i >= 0; i--) {
                     if (bubbles[i].update()) {
@@ -225,12 +230,11 @@
                         bubbles.splice(i, 1);
                     }
                 }
-                if (Math.random() < 0.1) { // Adjust frequency
+                if (Math.random() < 0.1) {
                     createBubble();
                 }
             }
 
-            // Update and draw hearts if active
             if (heartAnimationToggle.checked) {
                 for (let i = hearts.length - 1; i >= 0; i--) {
                     if (hearts[i].update()) {
@@ -239,19 +243,18 @@
                         hearts.splice(i, 1);
                     }
                 }
-                if (Math.random() < 0.05) { // Adjust frequency
+                if (Math.random() < 0.05) {
                     createHeart();
                 }
             }
 
-            animationFrameId = requestAnimationFrame(animateOverlay); // Loop
+            animationFrameId = requestAnimationFrame(animateOverlay);
         }
 
         function startOverlayAnimation() {
-            if (!animationFrameId) { // Start only if not already running
+            if (!animationFrameId) {
                 overlayCanvas.width = videoStream.videoWidth;
                 overlayCanvas.height = videoStream.videoHeight;
-                // Clear all particles when animation starts
                 bubbles.length = 0;
                 hearts.length = 0;
                 animateOverlay();
@@ -308,7 +311,7 @@
             bubbles.push(new Bubble(x, y, radius, color, speedY));
         }
 
-        // --- Heart Animation Class & Creator (NEW) ---
+        // --- Heart Animation Class & Creator ---
         class Heart {
             constructor(x, y, size, color, speedY, rotation) {
                 this.x = x;
@@ -317,8 +320,8 @@
                 this.color = color;
                 this.speedY = speedY;
                 this.opacity = 1.0;
-                this.rotation = rotation; // Initial rotation
-                this.rotationSpeed = (Math.random() - 0.5) * 0.05; // Small random rotation speed
+                this.rotation = rotation;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.05;
             }
 
             draw(ctx) {
@@ -338,7 +341,7 @@
 
             update() {
                 this.y += this.speedY;
-                this.opacity -= 0.008; // Fade out faster
+                this.opacity -= 0.008;
                 this.rotation += this.rotationSpeed;
                 return this.opacity > 0;
             }
@@ -346,15 +349,13 @@
 
         function createHeart() {
             const x = Math.random() * overlayCanvas.width;
-            const y = -20; // Start above the canvas
-            const size = Math.random() * 15 + 10; // 10 to 25 pixels
-            const color = `rgba(255, ${Math.floor(Math.random() * 100)}, ${Math.floor(Math.random() * 100)}, 0.9)`; // Reddish hues
-            const speedY = Math.random() * 1 + 0.5; // Move downwards, 0.5 to 1.5 pixels/frame
-            const rotation = Math.random() * Math.PI * 2; // Random initial rotation
+            const y = -20;
+            const size = Math.random() * 15 + 10;
+            const color = `rgba(255, ${Math.floor(Math.random() * 100)}, ${Math.floor(Math.random() * 100)}, 0.9)`;
+            const speedY = Math.random() * 1 + 0.5;
+            const rotation = Math.random() * Math.PI * 2;
             hearts.push(new Heart(x, y, size, color, speedY, rotation));
         }
-        // --- End Heart Animation Logic ---
-
 
         // --- Helper function to apply CSS filter equivalents to pixel data ---
         function applyCSSFilterEquivalentToPixels(pixels, cssFilterString) {
@@ -409,7 +410,6 @@
                         break;
                     case 'hue-rotate':
                     case 'blur':
-                        // Not implemented for pixel manipulation capture
                         break;
                 }
                 pixels[i] = Math.min(255, Math.max(0, newR));
@@ -503,14 +503,22 @@
 
         // --- Event Listeners ---
 
-        startCameraButton.addEventListener('click', async () => {
+        // Centralized function to start the camera stream
+        async function startCamera(facingMode) {
             errorMessage.textContent = '';
+            // Stop any existing stream first
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoStream.srcObject = null;
+                stream = null;
+            }
+
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: { ideal: 1920 },
                         height: { ideal: 1080 },
-                        facingMode: "user"
+                        facingMode: facingMode // Use the selected facingMode
                     }
                 });
 
@@ -522,8 +530,7 @@
                 overlayCanvas.width = videoStream.videoWidth;
                 overlayCanvas.height = videoStream.videoHeight;
 
-
-                console.log(`Actual video resolution: ${videoStream.videoWidth}x${videoStream.videoHeight}`);
+                console.log(`Actual video resolution: ${videoStream.videoWidth}x${videoStream.videoHeight}, Facing Mode: ${facingMode}`);
 
                 startCameraButton.disabled = true;
                 stopCameraButton.disabled = false;
@@ -531,11 +538,12 @@
                 liveFilterSelect.disabled = false;
                 bubbleAnimationToggle.disabled = false;
                 bubbleAnimationLabel.classList.remove('disabled');
-                heartAnimationToggle.disabled = false; // Enable heart animation toggle
-                heartAnimationLabel.classList.remove('disabled'); // Enable heart animation label
+                heartAnimationToggle.disabled = false;
+                heartAnimationLabel.classList.remove('disabled');
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
+                cameraSelect.disabled = false; // Keep camera select enabled
 
                 videoStream.style.filter = 'none';
                 outputImage.style.display = 'none';
@@ -546,31 +554,37 @@
                 liveFilterSelect.value = 'none';
                 postCaptureFilterSelect.value = 'none';
                 bubbleAnimationToggle.checked = false;
-                heartAnimationToggle.checked = false; // Ensure heart animation is off initially
-                stopOverlayAnimation(); // Stop any leftover animation
+                heartAnimationToggle.checked = false;
+                stopOverlayAnimation();
             } catch (err) {
                 console.error('Error accessing camera:', err);
                 if (err.name === 'NotAllowedError') {
                     errorMessage.textContent = 'Error: Camera access denied. Please grant permission in your browser settings.';
                 } else if (err.name === 'NotFoundError') {
-                    errorMessage.textContent = 'Error: No camera found on your device.';
+                    errorMessage.textContent = `Error: No '${facingMode}' camera found on your device.`;
                 } else if (err.name === 'OverconstrainedError') {
-                    errorMessage.textContent = 'Error: Your camera does not support the requested resolution. Trying a lower resolution might help.';
+                    errorMessage.textContent = 'Error: Your camera does not support the requested resolution or facing mode. Trying a lower resolution might help.';
                 } else {
                     errorMessage.textContent = `Error: Could not access camera. ${err.message}`;
                 }
+                // Reset button states on error
                 startCameraButton.disabled = false;
                 stopCameraButton.disabled = true;
                 takePhotoButton.disabled = true;
                 liveFilterSelect.disabled = true;
                 bubbleAnimationToggle.disabled = true;
                 bubbleAnimationLabel.classList.add('disabled');
-                heartAnimationToggle.disabled = true; // Disable heart animation toggle
-                heartAnimationLabel.classList.add('disabled'); // Disable heart animation label
+                heartAnimationToggle.disabled = true;
+                heartAnimationLabel.classList.add('disabled');
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
+                cameraSelect.disabled = false; // Keep camera select enabled
             }
+        }
+
+        startCameraButton.addEventListener('click', () => {
+            startCamera(cameraSelect.value); // Start camera with selected facing mode
         });
 
         stopCameraButton.addEventListener('click', () => {
@@ -585,11 +599,12 @@
                 liveFilterSelect.disabled = true;
                 bubbleAnimationToggle.disabled = true;
                 bubbleAnimationLabel.classList.add('disabled');
-                heartAnimationToggle.disabled = true; // Disable heart animation toggle
-                heartAnimationLabel.classList.add('disabled'); // Disable heart animation label
+                heartAnimationToggle.disabled = true;
+                heartAnimationLabel.classList.add('disabled');
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
+                cameraSelect.disabled = false; // Keep camera select enabled
 
                 videoStream.style.filter = 'none';
                 outputImage.src = '';
@@ -600,8 +615,8 @@
                 liveFilterSelect.value = 'none';
                 postCaptureFilterSelect.value = 'none';
                 bubbleAnimationToggle.checked = false;
-                heartAnimationToggle.checked = false; // Ensure heart animation is off
-                stopOverlayAnimation(); // Ensure animation is stopped
+                heartAnimationToggle.checked = false;
+                stopOverlayAnimation();
             }
         });
 
@@ -610,15 +625,12 @@
                 photoCanvas.width = videoStream.videoWidth;
                 photoCanvas.height = videoStream.videoHeight;
 
-                // 1. Draw the raw video frame to the photo-canvas
                 context.drawImage(videoStream, 0, 0, photoCanvas.width, photoCanvas.height);
 
-                // 2. If animations are enabled, draw the current state of the overlay canvas on top
                 if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
                     context.drawImage(overlayCanvas, 0, 0, photoCanvas.width, photoCanvas.height);
                 }
 
-                // 3. Apply the *active live CSS filter's equivalent* to the photo-canvas's pixels
                 const currentLiveFilter = liveFilterSelect.value;
                 if (currentLiveFilter !== 'none') {
                     const imageData = context.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
@@ -626,10 +638,8 @@
                     context.putImageData(imageData, 0, 0);
                 }
 
-                // Store the result (now includes live filter and animations)
                 originalImageDataURL = photoCanvas.toDataURL('image/png');
 
-                // Display the image
                 outputImage.src = originalImageDataURL;
                 outputImage.style.display = 'block';
 
@@ -667,7 +677,6 @@
             videoStream.style.filter = event.target.value;
         });
 
-        // Toggle the main animation loop based on any animation being active
         function updateAnimationState() {
             if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
                 startOverlayAnimation();
@@ -676,7 +685,16 @@
             }
         }
         bubbleAnimationToggle.addEventListener('change', updateAnimationState);
-        heartAnimationToggle.addEventListener('change', updateAnimationState); // New event listener
+        heartAnimationToggle.addEventListener('change', updateAnimationState);
+
+        // New: Event listener for camera selection change
+        cameraSelect.addEventListener('change', () => {
+            // If camera is already running, switch it
+            if (stream) {
+                startCamera(cameraSelect.value);
+            }
+        });
+
 
         postCaptureFilterSelect.addEventListener('change', (event) => {
             applyPostCaptureFilter(event.target.value);
@@ -693,13 +711,11 @@
             document.querySelector('.video-wrapper').style.height = `${videoStream.offsetWidth * (videoStream.videoHeight / videoStream.videoWidth)}px`;
             overlayCanvas.width = videoStream.videoWidth;
             overlayCanvas.height = videoStream.videoHeight;
-            // If any animation is currently checked, restart the loop to apply new dimensions
             if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
-                stopOverlayAnimation(); // Stop and then restart to ensure new dimensions are picked up
+                stopOverlayAnimation();
                 startOverlayAnimation();
             }
         });
     </script>
 </body>
 </html>
-
