@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera Photo Booth with Camera Switch</title>
+    <title>Camera Photo Booth with More Animations</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -165,6 +165,10 @@
                 <input type="checkbox" id="heart-animation-toggle" disabled>
                 Falling Hearts
             </label>
+            <label class="checkbox-container" id="sparkle-animation-label">
+                <input type="checkbox" id="sparkle-animation-toggle" disabled>
+                Sparkles
+            </label>
         </div>
         <div class="controls-row">
             <label for="post-capture-filter-select">Post-Capture Filter:</label>
@@ -202,7 +206,9 @@
         const bubbleAnimationLabel = document.getElementById('bubble-animation-label');
         const heartAnimationToggle = document.getElementById('heart-animation-toggle');
         const heartAnimationLabel = document.getElementById('heart-animation-label');
-        const cameraSelect = document.getElementById('camera-select'); // New element
+        const sparkleAnimationToggle = document.getElementById('sparkle-animation-toggle'); // New element
+        const sparkleAnimationLabel = document.getElementById('sparkle-animation-label'); // New element
+        const cameraSelect = document.getElementById('camera-select');
         const outputImage = document.getElementById('output-image');
         const photoCanvas = document.getElementById('photo-canvas');
         const errorMessage = document.getElementById('error-message');
@@ -217,11 +223,13 @@
         let animationFrameId;
         const bubbles = [];
         const hearts = [];
+        const sparkles = []; // New array for sparkles
 
         // --- Shared Animation Loop Logic ---
         function animateOverlay() {
-            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height); // Clear canvas once per frame
 
+            // Update and draw bubbles if active
             if (bubbleAnimationToggle.checked) {
                 for (let i = bubbles.length - 1; i >= 0; i--) {
                     if (bubbles[i].update()) {
@@ -235,6 +243,7 @@
                 }
             }
 
+            // Update and draw hearts if active
             if (heartAnimationToggle.checked) {
                 for (let i = hearts.length - 1; i >= 0; i--) {
                     if (hearts[i].update()) {
@@ -248,15 +257,31 @@
                 }
             }
 
-            animationFrameId = requestAnimationFrame(animateOverlay);
+            // Update and draw sparkles if active (NEW)
+            if (sparkleAnimationToggle.checked) {
+                for (let i = sparkles.length - 1; i >= 0; i--) {
+                    if (sparkles[i].update()) {
+                        sparkles[i].draw(overlayContext);
+                    } else {
+                        sparkles.splice(i, 1);
+                    }
+                }
+                if (Math.random() < 0.2) { // Adjust frequency
+                    createSparkle();
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(animateOverlay); // Loop
         }
 
         function startOverlayAnimation() {
             if (!animationFrameId) {
                 overlayCanvas.width = videoStream.videoWidth;
                 overlayCanvas.height = videoStream.videoHeight;
+                // Clear all particles when animation starts
                 bubbles.length = 0;
                 hearts.length = 0;
+                sparkles.length = 0; // Clear sparkles
                 animateOverlay();
             }
         }
@@ -268,6 +293,7 @@
                 overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 bubbles.length = 0;
                 hearts.length = 0;
+                sparkles.length = 0; // Clear sparkles
             }
         }
 
@@ -356,6 +382,67 @@
             const rotation = Math.random() * Math.PI * 2;
             hearts.push(new Heart(x, y, size, color, speedY, rotation));
         }
+
+        // --- Sparkle Animation Class & Creator (NEW) ---
+        class Sparkle {
+            constructor(x, y, size, color, life) {
+                this.x = x;
+                this.y = y;
+                this.initialSize = size;
+                this.size = size;
+                this.color = color;
+                this.life = life; // Total frames to live
+                this.currentLife = life;
+                this.opacity = 1.0;
+                this.fadeRate = 1 / life;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = this.color;
+                // Draw a simple star/cross shape for sparkle
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.size, this.y);
+                ctx.lineTo(this.x + this.size, this.y);
+                ctx.moveTo(this.x, this.y - this.size);
+                ctx.lineTo(this.x, this.y + this.size);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Draw small diagonals for more sparkle effect
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.size * 0.7, this.y - this.size * 0.7);
+                ctx.lineTo(this.x + this.size * 0.7, this.y + this.size * 0.7);
+                ctx.moveTo(this.x + this.size * 0.7, this.y - this.size * 0.7);
+                ctx.lineTo(this.x - this.size * 0.7, this.y + this.size * 0.7);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            update() {
+                this.currentLife--;
+                this.opacity = this.currentLife / this.life;
+                this.size = this.initialSize * (this.currentLife / this.life); // Shrink as it fades
+
+                return this.currentLife > 0;
+            }
+        }
+
+        function createSparkle() {
+            const x = Math.random() * overlayCanvas.width;
+            const y = Math.random() * overlayCanvas.height;
+            const size = Math.random() * 3 + 2; // 2 to 5 pixels
+            const color = `rgba(255, 255, ${Math.floor(Math.random() * 150)}, 1)`; // Yellowish white
+            const life = Math.floor(Math.random() * 60) + 30; // Live for 30-90 frames
+            sparkles.push(new Sparkle(x, y, size, color, life));
+        }
+        // --- End Sparkle Animation Logic ---
+
 
         // --- Helper function to apply CSS filter equivalents to pixel data ---
         function applyCSSFilterEquivalentToPixels(pixels, cssFilterString) {
@@ -503,10 +590,8 @@
 
         // --- Event Listeners ---
 
-        // Centralized function to start the camera stream
         async function startCamera(facingMode) {
             errorMessage.textContent = '';
-            // Stop any existing stream first
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 videoStream.srcObject = null;
@@ -518,7 +603,7 @@
                     video: {
                         width: { ideal: 1920 },
                         height: { ideal: 1080 },
-                        facingMode: facingMode // Use the selected facingMode
+                        facingMode: facingMode
                     }
                 });
 
@@ -530,6 +615,7 @@
                 overlayCanvas.width = videoStream.videoWidth;
                 overlayCanvas.height = videoStream.videoHeight;
 
+
                 console.log(`Actual video resolution: ${videoStream.videoWidth}x${videoStream.videoHeight}, Facing Mode: ${facingMode}`);
 
                 startCameraButton.disabled = true;
@@ -540,10 +626,12 @@
                 bubbleAnimationLabel.classList.remove('disabled');
                 heartAnimationToggle.disabled = false;
                 heartAnimationLabel.classList.remove('disabled');
+                sparkleAnimationToggle.disabled = false; // Enable sparkle animation toggle
+                sparkleAnimationLabel.classList.remove('disabled'); // Enable sparkle animation label
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
-                cameraSelect.disabled = false; // Keep camera select enabled
+                cameraSelect.disabled = false;
 
                 videoStream.style.filter = 'none';
                 outputImage.style.display = 'none';
@@ -555,6 +643,7 @@
                 postCaptureFilterSelect.value = 'none';
                 bubbleAnimationToggle.checked = false;
                 heartAnimationToggle.checked = false;
+                sparkleAnimationToggle.checked = false; // Ensure sparkle animation is off initially
                 stopOverlayAnimation();
             } catch (err) {
                 console.error('Error accessing camera:', err);
@@ -567,7 +656,6 @@
                 } else {
                     errorMessage.textContent = `Error: Could not access camera. ${err.message}`;
                 }
-                // Reset button states on error
                 startCameraButton.disabled = false;
                 stopCameraButton.disabled = true;
                 takePhotoButton.disabled = true;
@@ -576,15 +664,17 @@
                 bubbleAnimationLabel.classList.add('disabled');
                 heartAnimationToggle.disabled = true;
                 heartAnimationLabel.classList.add('disabled');
+                sparkleAnimationToggle.disabled = true; // Disable sparkle animation toggle
+                sparkleAnimationLabel.classList.add('disabled'); // Disable sparkle animation label
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
-                cameraSelect.disabled = false; // Keep camera select enabled
+                cameraSelect.disabled = false;
             }
         }
 
         startCameraButton.addEventListener('click', () => {
-            startCamera(cameraSelect.value); // Start camera with selected facing mode
+            startCamera(cameraSelect.value);
         });
 
         stopCameraButton.addEventListener('click', () => {
@@ -601,10 +691,12 @@
                 bubbleAnimationLabel.classList.add('disabled');
                 heartAnimationToggle.disabled = true;
                 heartAnimationLabel.classList.add('disabled');
+                sparkleAnimationToggle.disabled = true; // Disable sparkle animation toggle
+                sparkleAnimationLabel.classList.add('disabled'); // Disable sparkle animation label
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
-                cameraSelect.disabled = false; // Keep camera select enabled
+                cameraSelect.disabled = false;
 
                 videoStream.style.filter = 'none';
                 outputImage.src = '';
@@ -616,6 +708,7 @@
                 postCaptureFilterSelect.value = 'none';
                 bubbleAnimationToggle.checked = false;
                 heartAnimationToggle.checked = false;
+                sparkleAnimationToggle.checked = false; // Ensure sparkle animation is off
                 stopOverlayAnimation();
             }
         });
@@ -627,7 +720,8 @@
 
                 context.drawImage(videoStream, 0, 0, photoCanvas.width, photoCanvas.height);
 
-                if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
+                // Draw all enabled animations onto the photo-canvas
+                if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked) {
                     context.drawImage(overlayCanvas, 0, 0, photoCanvas.width, photoCanvas.height);
                 }
 
@@ -678,7 +772,7 @@
         });
 
         function updateAnimationState() {
-            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
+            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked) {
                 startOverlayAnimation();
             } else {
                 stopOverlayAnimation();
@@ -686,15 +780,13 @@
         }
         bubbleAnimationToggle.addEventListener('change', updateAnimationState);
         heartAnimationToggle.addEventListener('change', updateAnimationState);
+        sparkleAnimationToggle.addEventListener('change', updateAnimationState); // New event listener
 
-        // New: Event listener for camera selection change
         cameraSelect.addEventListener('change', () => {
-            // If camera is already running, switch it
             if (stream) {
                 startCamera(cameraSelect.value);
             }
         });
-
 
         postCaptureFilterSelect.addEventListener('change', (event) => {
             applyPostCaptureFilter(event.target.value);
@@ -711,7 +803,7 @@
             document.querySelector('.video-wrapper').style.height = `${videoStream.offsetWidth * (videoStream.videoHeight / videoStream.videoWidth)}px`;
             overlayCanvas.width = videoStream.videoWidth;
             overlayCanvas.height = videoStream.videoHeight;
-            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked) {
+            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked) {
                 stopOverlayAnimation();
                 startOverlayAnimation();
             }
