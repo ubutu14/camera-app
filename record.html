@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video & Audio Recorder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        video {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #000;
+            margin-bottom: 20px;
+        }
+        button, select {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            vertical-align: middle;
+        }
+        button:hover, select:hover {
+            background-color: #0056b3;
+        }
+        button:disabled, select:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #recorded-video {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none; /* Hidden until a video is recorded */
+        }
+        #error-message {
+            color: red;
+            margin-top: 10px;
+        }
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video & Audio Recorder</h1>
+
+        <!-- Video element for live camera preview -->
+        <video id="video-preview" autoplay playsinline muted></video>
+        <!-- Video element to display the recorded video -->
+        <video id="recorded-video" controls></video>
+
+        <div class="controls-row">
+            <label for="camera-select">Camera:</label>
+            <select id="camera-select">
+                <option value="user">Front Camera</option>
+                <option value="environment">Rear Camera</option>
+            </select>
+            <button id="start-camera">Start Camera</button>
+            <button id="stop-camera" disabled>Stop Camera</button>
+            <button id="start-record" disabled>Record</button>
+            <button id="stop-record" disabled>Stop Recording</button>
+            <button id="download-video" disabled>Download Video</button>
+        </div>
+
+        <p id="error-message"></p>
+
+        <p>Go back to <a href="index.html">Photo Booth</a></p>
+    </div>
+
+    <script>
+        const videoPreview = document.getElementById('video-preview');
+        const recordedVideo = document.getElementById('recorded-video');
+        const startCameraButton = document.getElementById('start-camera');
+        const stopCameraButton = document.getElementById('stop-camera');
+        const startRecordButton = document.getElementById('start-record');
+        const stopRecordButton = document.getElementById('stop-record');
+        const downloadVideoButton = document.getElementById('download-video');
+        const cameraSelect = document.getElementById('camera-select');
+        const errorMessage = document.getElementById('error-message');
+
+        let currentStream; // Stores the MediaStream from getUserMedia
+        let mediaRecorder; // Stores the MediaRecorder instance
+        let recordedChunks = []; // Array to collect recorded video data chunks
+        let recordedVideoURL; // URL for the final recorded video Blob
+
+        // Function to start camera and microphone stream
+        async function startCamera(facingMode) {
+            errorMessage.textContent = '';
+            // Stop any existing stream first to switch cameras or restart
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                videoPreview.srcObject = null;
+                currentStream = null;
+            }
+
+            try {
+                // Request both video and audio
+                currentStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 }, // Request 720p or 1080p for good quality
+                        height: { ideal: 720 },
+                        facingMode: facingMode // 'user' for front, 'environment' for rear
+                    },
+                    audio: true // Request audio as well
+                });
+
+                videoPreview.srcObject = currentStream;
+                await videoPreview.play(); // Start playing the preview
+
+                console.log(`Actual video resolution: ${videoPreview.videoWidth}x${videoPreview.videoHeight}, Facing Mode: ${facingMode}`);
+
+                // Update button states
+                startCameraButton.disabled = true;
+                stopCameraButton.disabled = false;
+                startRecordButton.disabled = false; // Enable record button once camera is on
+                cameraSelect.disabled = false; // Keep camera select enabled
+
+                // Hide previously recorded video and disable download
+                recordedVideo.style.display = 'none';
+                recordedVideo.src = '';
+                downloadVideoButton.disabled = true;
+                if (recordedVideoURL) URL.revokeObjectURL(recordedVideoURL); // Clean up old Blob URL
+
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                if (err.name === 'NotAllowedError') {
+                    errorMessage.textContent = 'Error: Camera and/or microphone access denied. Please grant permission in your browser settings.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMessage.textContent = `Error: No '${facingMode}' camera or microphone found on your device.`;
+                } else if (err.name === 'OverconstrainedError') {
+                    errorMessage.textContent = 'Error: Your device does not support the requested resolution or facing mode. Trying a lower resolution might help.';
+                } else {
+                    errorMessage.textContent = `Error: Could not access camera/microphone. ${err.message}`;
+                }
+                // Reset button states on error
+                startCameraButton.disabled = false;
+                stopCameraButton.disabled = true;
+                startRecordButton.disabled = true;
+                stopRecordButton.disabled = true;
+                downloadVideoButton.disabled = true;
+                cameraSelect.disabled = false;
+            }
+        }
+
+        // --- Event Listeners for Controls ---
+
+        startCameraButton.addEventListener('click', () => {
+            startCamera(cameraSelect.value); // Start camera with the currently selected facing mode
+        });
+
+        stopCameraButton.addEventListener('click', () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop()); // Stop all tracks in the stream
+                videoPreview.srcObject = null; // Disconnect stream from video element
+                currentStream = null;
+
+                // Reset button states
+                startCameraButton.disabled = false;
+                stopCameraButton.disabled = true;
+                startRecordButton.disabled = true;
+                stopRecordButton.disabled = true;
+                cameraSelect.disabled = false;
+
+                // Clear and hide recorded video
+                recordedVideo.style.display = 'none';
+                recordedVideo.src = '';
+                downloadVideoButton.disabled = true;
+                if (recordedVideoURL) URL.revokeObjectURL(recordedVideoURL); // Clean up Blob URL
+            }
+        });
+
+        startRecordButton.addEventListener('click', () => {
+            recordedChunks = []; // Reset chunks for a new recording
+            recordedVideo.style.display = 'none'; // Hide previous recording preview
+            recordedVideo.src = ''; // Clear previous recording source
+            downloadVideoButton.disabled = true; // Disable download until new recording is done
+            if (recordedVideoURL) URL.revokeObjectURL(recordedVideoURL); // Revoke old URL to free memory
+
+            try {
+                if (!currentStream) {
+                    errorMessage.textContent = "Error: Camera stream not active. Please start camera first.";
+                    return;
+                }
+
+                // Determine the best MIME type for recording
+                let options = { mimeType: 'video/webm; codecs=vp9,opus' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'video/webm; codecs=vp8,opus' };
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        options = { mimeType: 'video/webm' };
+                        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                            errorMessage.textContent = "Error: Your browser does not support video recording in WebM format.";
+                            console.error("No supported WebM MIME type for MediaRecorder");
+                            return;
+                        }
+                    }
+                }
+
+                mediaRecorder = new MediaRecorder(currentStream, options);
+
+                // Event handler for when data chunks are available
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                // Event handler for when recording stops
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+                    recordedVideoURL = URL.createObjectURL(blob); // Create a URL for the Blob
+                    recordedVideo.src = recordedVideoURL; // Set the recorded video as the source
+                    recordedVideo.style.display = 'block'; // Show the recorded video element
+                    downloadVideoButton.disabled = false; // Enable download button
+                    recordedVideo.play(); // Auto-play the recorded video
+
+                    // Reset record buttons
+                    startRecordButton.disabled = false;
+                    stopRecordButton.disabled = true;
+                };
+
+                // Event handler for recording errors
+                mediaRecorder.onerror = (event) => {
+                    console.error('MediaRecorder error:', event.error);
+                    errorMessage.textContent = `Recording error: ${event.error.name}`;
+                    startRecordButton.disabled = false;
+                    stopRecordButton.disabled = true;
+                    downloadVideoButton.disabled = true;
+                };
+
+                mediaRecorder.start(); // Start the recording
+                console.log('Recording started...');
+                startRecordButton.disabled = true; // Disable start record button
+                stopRecordButton.disabled = false; // Enable stop record button
+
+            } catch (error) {
+                console.error('Failed to start recording:', error);
+                errorMessage.textContent = `Failed to start recording: ${error.message}`;
+                startRecordButton.disabled = false;
+                stopRecordButton.disabled = true;
+            }
+        });
+
+        stopRecordButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop(); // Stop the recording
+                console.log('Recording stopped.');
+            }
+        });
+
+        downloadVideoButton.addEventListener('click', () => {
+            if (recordedVideoURL) {
+                const a = document.createElement('a'); // Create a temporary anchor element
+                a.href = recordedVideoURL;
+                a.download = `recorded-video-${Date.now()}.webm`; // Suggest a filename with timestamp
+                document.body.appendChild(a); // Append to body (required for Firefox)
+                a.click(); // Programmatically click the link to trigger download
+                document.body.removeChild(a); // Remove the temporary link
+            }
+        });
+
+        cameraSelect.addEventListener('change', () => {
+            // If a stream is active, switch cameras immediately
+            if (currentStream) {
+                startCamera(cameraSelect.value);
+            }
+        });
+
+        // Clean up resources when the page is closed or navigated away from
+        window.addEventListener('beforeunload', () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            if (recordedVideoURL) {
+                URL.revokeObjectURL(recordedVideoURL); // Revoke the Blob URL to free memory
+            }
+        });
+    </script>
+</body>
+</html>
