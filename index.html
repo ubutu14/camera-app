@@ -171,6 +171,12 @@
             </label>
         </div>
         <div class="controls-row">
+            <label class="checkbox-container" id="emoji-animation-label">
+                <input type="checkbox" id="emoji-animation-toggle" disabled>
+                Floating Emojis
+            </label>
+        </div>
+        <div class="controls-row">
             <label for="post-capture-filter-select">Post-Capture Filter:</label>
             <select id="post-capture-filter-select" disabled>
                 <option value="none">No Filter</option>
@@ -206,8 +212,10 @@
         const bubbleAnimationLabel = document.getElementById('bubble-animation-label');
         const heartAnimationToggle = document.getElementById('heart-animation-toggle');
         const heartAnimationLabel = document.getElementById('heart-animation-label');
-        const sparkleAnimationToggle = document.getElementById('sparkle-animation-toggle'); // New element
-        const sparkleAnimationLabel = document.getElementById('sparkle-animation-label'); // New element
+        const sparkleAnimationToggle = document.getElementById('sparkle-animation-toggle');
+        const sparkleAnimationLabel = document.getElementById('sparkle-animation-label');
+        const emojiAnimationToggle = document.getElementById('emoji-animation-toggle'); // New element
+        const emojiAnimationLabel = document.getElementById('emoji-animation-label'); // New element
         const cameraSelect = document.getElementById('camera-select');
         const outputImage = document.getElementById('output-image');
         const photoCanvas = document.getElementById('photo-canvas');
@@ -223,7 +231,9 @@
         let animationFrameId;
         const bubbles = [];
         const hearts = [];
-        const sparkles = []; // New array for sparkles
+        const sparkles = [];
+        const emojis = []; // New array for emojis
+        const emojiCharacters = ['🎉', '✨', '💖', '🌈', '🌟', '😊', '❤️']; // Emojis to choose from
 
         // --- Shared Animation Loop Logic ---
         function animateOverlay() {
@@ -257,7 +267,7 @@
                 }
             }
 
-            // Update and draw sparkles if active (NEW)
+            // Update and draw sparkles if active
             if (sparkleAnimationToggle.checked) {
                 for (let i = sparkles.length - 1; i >= 0; i--) {
                     if (sparkles[i].update()) {
@@ -266,8 +276,22 @@
                         sparkles.splice(i, 1);
                     }
                 }
-                if (Math.random() < 0.2) { // Adjust frequency
+                if (Math.random() < 0.2) {
                     createSparkle();
+                }
+            }
+
+            // Update and draw emojis if active (NEW)
+            if (emojiAnimationToggle.checked) {
+                for (let i = emojis.length - 1; i >= 0; i--) {
+                    if (emojis[i].update()) {
+                        emojis[i].draw(overlayContext);
+                    } else {
+                        emojis.splice(i, 1);
+                    }
+                }
+                if (Math.random() < 0.08) { // Adjust frequency
+                    createEmoji();
                 }
             }
 
@@ -281,7 +305,8 @@
                 // Clear all particles when animation starts
                 bubbles.length = 0;
                 hearts.length = 0;
-                sparkles.length = 0; // Clear sparkles
+                sparkles.length = 0;
+                emojis.length = 0; // Clear emojis
                 animateOverlay();
             }
         }
@@ -293,7 +318,8 @@
                 overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 bubbles.length = 0;
                 hearts.length = 0;
-                sparkles.length = 0; // Clear sparkles
+                sparkles.length = 0;
+                emojis.length = 0; // Clear emojis
             }
         }
 
@@ -383,7 +409,7 @@
             hearts.push(new Heart(x, y, size, color, speedY, rotation));
         }
 
-        // --- Sparkle Animation Class & Creator (NEW) ---
+        // --- Sparkle Animation Class & Creator ---
         class Sparkle {
             constructor(x, y, size, color, life) {
                 this.x = x;
@@ -391,7 +417,7 @@
                 this.initialSize = size;
                 this.size = size;
                 this.color = color;
-                this.life = life; // Total frames to live
+                this.life = life;
                 this.currentLife = life;
                 this.opacity = 1.0;
                 this.fadeRate = 1 / life;
@@ -401,7 +427,6 @@
                 ctx.save();
                 ctx.globalAlpha = this.opacity;
                 ctx.fillStyle = this.color;
-                // Draw a simple star/cross shape for sparkle
                 ctx.beginPath();
                 ctx.moveTo(this.x - this.size, this.y);
                 ctx.lineTo(this.x + this.size, this.y);
@@ -411,7 +436,6 @@
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
-                // Draw small diagonals for more sparkle effect
                 ctx.beginPath();
                 ctx.moveTo(this.x - this.size * 0.7, this.y - this.size * 0.7);
                 ctx.lineTo(this.x + this.size * 0.7, this.y + this.size * 0.7);
@@ -427,8 +451,7 @@
             update() {
                 this.currentLife--;
                 this.opacity = this.currentLife / this.life;
-                this.size = this.initialSize * (this.currentLife / this.life); // Shrink as it fades
-
+                this.size = this.initialSize * (this.currentLife / this.life);
                 return this.currentLife > 0;
             }
         }
@@ -436,12 +459,52 @@
         function createSparkle() {
             const x = Math.random() * overlayCanvas.width;
             const y = Math.random() * overlayCanvas.height;
-            const size = Math.random() * 3 + 2; // 2 to 5 pixels
-            const color = `rgba(255, 255, ${Math.floor(Math.random() * 150)}, 1)`; // Yellowish white
-            const life = Math.floor(Math.random() * 60) + 30; // Live for 30-90 frames
+            const size = Math.random() * 3 + 2;
+            const color = `rgba(255, 255, ${Math.floor(Math.random() * 150)}, 1)`;
+            const life = Math.floor(Math.random() * 60) + 30;
             sparkles.push(new Sparkle(x, y, size, color, life));
         }
-        // --- End Sparkle Animation Logic ---
+
+        // --- Floating Emoji Animation Class & Creator (NEW) ---
+        class FloatingEmoji {
+            constructor(x, y, emoji, size, speedX, speedY) {
+                this.x = x;
+                this.y = y;
+                this.emoji = emoji;
+                this.size = size;
+                this.speedX = speedX;
+                this.speedY = speedY;
+                this.opacity = 1.0;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.font = `${this.size}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.emoji, this.x, this.y);
+                ctx.restore();
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.opacity -= 0.007; // Fade out
+                return this.opacity > 0;
+            }
+        }
+
+        function createEmoji() {
+            const emoji = emojiCharacters[Math.floor(Math.random() * emojiCharacters.length)];
+            const size = Math.random() * 20 + 30; // 30 to 50 pixels
+            const x = Math.random() * overlayCanvas.width;
+            const y = overlayCanvas.height + 50; // Start below canvas
+            const speedX = (Math.random() - 0.5) * 2; // -1 to 1 horizontal speed
+            const speedY = -(Math.random() * 1.5 + 0.5); // -0.5 to -2 vertical speed (float up)
+            emojis.push(new FloatingEmoji(x, y, emoji, size, speedX, speedY));
+        }
+        // --- End Floating Emoji Animation Logic ---
 
 
         // --- Helper function to apply CSS filter equivalents to pixel data ---
@@ -626,8 +689,10 @@
                 bubbleAnimationLabel.classList.remove('disabled');
                 heartAnimationToggle.disabled = false;
                 heartAnimationLabel.classList.remove('disabled');
-                sparkleAnimationToggle.disabled = false; // Enable sparkle animation toggle
-                sparkleAnimationLabel.classList.remove('disabled'); // Enable sparkle animation label
+                sparkleAnimationToggle.disabled = false;
+                sparkleAnimationLabel.classList.remove('disabled');
+                emojiAnimationToggle.disabled = false; // Enable emoji animation toggle
+                emojiAnimationLabel.classList.remove('disabled'); // Enable emoji animation label
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
@@ -643,7 +708,8 @@
                 postCaptureFilterSelect.value = 'none';
                 bubbleAnimationToggle.checked = false;
                 heartAnimationToggle.checked = false;
-                sparkleAnimationToggle.checked = false; // Ensure sparkle animation is off initially
+                sparkleAnimationToggle.checked = false;
+                emojiAnimationToggle.checked = false; // Ensure emoji animation is off initially
                 stopOverlayAnimation();
             } catch (err) {
                 console.error('Error accessing camera:', err);
@@ -664,8 +730,10 @@
                 bubbleAnimationLabel.classList.add('disabled');
                 heartAnimationToggle.disabled = true;
                 heartAnimationLabel.classList.add('disabled');
-                sparkleAnimationToggle.disabled = true; // Disable sparkle animation toggle
-                sparkleAnimationLabel.classList.add('disabled'); // Disable sparkle animation label
+                sparkleAnimationToggle.disabled = true;
+                sparkleAnimationLabel.classList.add('disabled');
+                emojiAnimationToggle.disabled = true; // Disable emoji animation toggle
+                emojiAnimationLabel.classList.add('disabled'); // Disable emoji animation label
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
@@ -691,8 +759,10 @@
                 bubbleAnimationLabel.classList.add('disabled');
                 heartAnimationToggle.disabled = true;
                 heartAnimationLabel.classList.add('disabled');
-                sparkleAnimationToggle.disabled = true; // Disable sparkle animation toggle
-                sparkleAnimationLabel.classList.add('disabled'); // Disable sparkle animation label
+                sparkleAnimationToggle.disabled = true;
+                sparkleAnimationLabel.classList.add('disabled');
+                emojiAnimationToggle.disabled = true; // Disable emoji animation toggle
+                emojiAnimationLabel.classList.add('disabled'); // Disable emoji animation label
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
@@ -708,7 +778,8 @@
                 postCaptureFilterSelect.value = 'none';
                 bubbleAnimationToggle.checked = false;
                 heartAnimationToggle.checked = false;
-                sparkleAnimationToggle.checked = false; // Ensure sparkle animation is off
+                sparkleAnimationToggle.checked = false;
+                emojiAnimationToggle.checked = false; // Ensure emoji animation is off
                 stopOverlayAnimation();
             }
         });
@@ -721,7 +792,7 @@
                 context.drawImage(videoStream, 0, 0, photoCanvas.width, photoCanvas.height);
 
                 // Draw all enabled animations onto the photo-canvas
-                if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked) {
+                if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked || emojiAnimationToggle.checked) {
                     context.drawImage(overlayCanvas, 0, 0, photoCanvas.width, photoCanvas.height);
                 }
 
@@ -772,7 +843,7 @@
         });
 
         function updateAnimationState() {
-            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked) {
+            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked || emojiAnimationToggle.checked) {
                 startOverlayAnimation();
             } else {
                 stopOverlayAnimation();
@@ -780,7 +851,8 @@
         }
         bubbleAnimationToggle.addEventListener('change', updateAnimationState);
         heartAnimationToggle.addEventListener('change', updateAnimationState);
-        sparkleAnimationToggle.addEventListener('change', updateAnimationState); // New event listener
+        sparkleAnimationToggle.addEventListener('change', updateAnimationState);
+        emojiAnimationToggle.addEventListener('change', updateAnimationState); // New event listener
 
         cameraSelect.addEventListener('change', () => {
             if (stream) {
@@ -803,7 +875,7 @@
             document.querySelector('.video-wrapper').style.height = `${videoStream.offsetWidth * (videoStream.videoHeight / videoStream.videoWidth)}px`;
             overlayCanvas.width = videoStream.videoWidth;
             overlayCanvas.height = videoStream.videoHeight;
-            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked) {
+            if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked || emojiAnimationToggle.checked) {
                 stopOverlayAnimation();
                 startOverlayAnimation();
             }
