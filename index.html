@@ -195,6 +195,8 @@
 
         <h2>Captured Photo:</h2>
         <img id="output-image" alt="Captured Photo">
+
+        <p>Go to <a href="record.html">Video and Audio Recorder</a></p> <!-- Added link here -->
     </div>
 
     <canvas id="photo-canvas"></canvas>
@@ -214,8 +216,8 @@
         const heartAnimationLabel = document.getElementById('heart-animation-label');
         const sparkleAnimationToggle = document.getElementById('sparkle-animation-toggle');
         const sparkleAnimationLabel = document.getElementById('sparkle-animation-label');
-        const emojiAnimationToggle = document.getElementById('emoji-animation-toggle'); // New element
-        const emojiAnimationLabel = document.getElementById('emoji-animation-label'); // New element
+        const emojiAnimationToggle = document.getElementById('emoji-animation-toggle');
+        const emojiAnimationLabel = document.getElementById('emoji-animation-label');
         const cameraSelect = document.getElementById('camera-select');
         const outputImage = document.getElementById('output-image');
         const photoCanvas = document.getElementById('photo-canvas');
@@ -232,14 +234,13 @@
         const bubbles = [];
         const hearts = [];
         const sparkles = [];
-        const emojis = []; // New array for emojis
-        const emojiCharacters = ['🎉', '✨', '💖', '🌈', '🌟', '😊', '❤️']; // Emojis to choose from
+        const emojis = [];
+        const emojiCharacters = ['🎉', '✨', '💖', '🌈', '🌟', '😊', '❤️'];
 
         // --- Shared Animation Loop Logic ---
         function animateOverlay() {
-            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height); // Clear canvas once per frame
+            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-            // Update and draw bubbles if active
             if (bubbleAnimationToggle.checked) {
                 for (let i = bubbles.length - 1; i >= 0; i--) {
                     if (bubbles[i].update()) {
@@ -253,7 +254,6 @@
                 }
             }
 
-            // Update and draw hearts if active
             if (heartAnimationToggle.checked) {
                 for (let i = hearts.length - 1; i >= 0; i--) {
                     if (hearts[i].update()) {
@@ -267,7 +267,6 @@
                 }
             }
 
-            // Update and draw sparkles if active
             if (sparkleAnimationToggle.checked) {
                 for (let i = sparkles.length - 1; i >= 0; i--) {
                     if (sparkles[i].update()) {
@@ -281,7 +280,6 @@
                 }
             }
 
-            // Update and draw emojis if active (NEW)
             if (emojiAnimationToggle.checked) {
                 for (let i = emojis.length - 1; i >= 0; i--) {
                     if (emojis[i].update()) {
@@ -290,23 +288,22 @@
                         emojis.splice(i, 1);
                     }
                 }
-                if (Math.random() < 0.08) { // Adjust frequency
+                if (Math.random() < 0.08) {
                     createEmoji();
                 }
             }
 
-            animationFrameId = requestAnimationFrame(animateOverlay); // Loop
+            animationFrameId = requestAnimationFrame(animateOverlay);
         }
 
         function startOverlayAnimation() {
             if (!animationFrameId) {
                 overlayCanvas.width = videoStream.videoWidth;
                 overlayCanvas.height = videoStream.videoHeight;
-                // Clear all particles when animation starts
                 bubbles.length = 0;
                 hearts.length = 0;
                 sparkles.length = 0;
-                emojis.length = 0; // Clear emojis
+                emojis.length = 0;
                 animateOverlay();
             }
         }
@@ -319,7 +316,7 @@
                 bubbles.length = 0;
                 hearts.length = 0;
                 sparkles.length = 0;
-                emojis.length = 0; // Clear emojis
+                emojis.length = 0;
             }
         }
 
@@ -465,7 +462,7 @@
             sparkles.push(new Sparkle(x, y, size, color, life));
         }
 
-        // --- Floating Emoji Animation Class & Creator (NEW) ---
+        // --- Floating Emoji Animation Class & Creator ---
         class FloatingEmoji {
             constructor(x, y, emoji, size, speedX, speedY) {
                 this.x = x;
@@ -490,22 +487,20 @@
             update() {
                 this.x += this.speedX;
                 this.y += this.speedY;
-                this.opacity -= 0.007; // Fade out
+                this.opacity -= 0.007;
                 return this.opacity > 0;
             }
         }
 
         function createEmoji() {
             const emoji = emojiCharacters[Math.floor(Math.random() * emojiCharacters.length)];
-            const size = Math.random() * 20 + 30; // 30 to 50 pixels
+            const size = Math.random() * 20 + 30;
             const x = Math.random() * overlayCanvas.width;
-            const y = overlayCanvas.height + 50; // Start below canvas
-            const speedX = (Math.random() - 0.5) * 2; // -1 to 1 horizontal speed
-            const speedY = -(Math.random() * 1.5 + 0.5); // -0.5 to -2 vertical speed (float up)
+            const y = overlayCanvas.height + 50;
+            const speedX = (Math.random() - 0.5) * 2;
+            const speedY = -(Math.random() * 1.5 + 0.5);
             emojis.push(new FloatingEmoji(x, y, emoji, size, speedX, speedY));
         }
-        // --- End Floating Emoji Animation Logic ---
-
 
         // --- Helper function to apply CSS filter equivalents to pixel data ---
         function applyCSSFilterEquivalentToPixels(pixels, cssFilterString) {
@@ -691,8 +686,8 @@
                 heartAnimationLabel.classList.remove('disabled');
                 sparkleAnimationToggle.disabled = false;
                 sparkleAnimationLabel.classList.remove('disabled');
-                emojiAnimationToggle.disabled = false; // Enable emoji animation toggle
-                emojiAnimationLabel.classList.remove('disabled'); // Enable emoji animation label
+                emojiAnimationToggle.disabled = false;
+                emojiAnimationLabel.classList.remove('disabled');
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
@@ -709,7 +704,7 @@
                 bubbleAnimationToggle.checked = false;
                 heartAnimationToggle.checked = false;
                 sparkleAnimationToggle.checked = false;
-                emojiAnimationToggle.checked = false; // Ensure emoji animation is off initially
+                emojiAnimationToggle.checked = false;
                 stopOverlayAnimation();
             } catch (err) {
                 console.error('Error accessing camera:', err);
@@ -732,8 +727,8 @@
                 heartAnimationLabel.classList.add('disabled');
                 sparkleAnimationToggle.disabled = true;
                 sparkleAnimationLabel.classList.add('disabled');
-                emojiAnimationToggle.disabled = true; // Disable emoji animation toggle
-                emojiAnimationLabel.classList.add('disabled'); // Disable emoji animation label
+                emojiAnimationToggle.disabled = true;
+                emojiAnimationLabel.classList.add('disabled');
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
@@ -761,8 +756,8 @@
                 heartAnimationLabel.classList.add('disabled');
                 sparkleAnimationToggle.disabled = true;
                 sparkleAnimationLabel.classList.add('disabled');
-                emojiAnimationToggle.disabled = true; // Disable emoji animation toggle
-                emojiAnimationLabel.classList.add('disabled'); // Disable emoji animation label
+                emojiAnimationToggle.disabled = true;
+                emojiAnimationLabel.classList.add('disabled');
                 postCaptureFilterSelect.disabled = true;
                 flipPhotoButton.disabled = true;
                 clearPhotoButton.disabled = true;
@@ -779,7 +774,7 @@
                 bubbleAnimationToggle.checked = false;
                 heartAnimationToggle.checked = false;
                 sparkleAnimationToggle.checked = false;
-                emojiAnimationToggle.checked = false; // Ensure emoji animation is off
+                emojiAnimationToggle.checked = false;
                 stopOverlayAnimation();
             }
         });
@@ -791,7 +786,6 @@
 
                 context.drawImage(videoStream, 0, 0, photoCanvas.width, photoCanvas.height);
 
-                // Draw all enabled animations onto the photo-canvas
                 if (bubbleAnimationToggle.checked || heartAnimationToggle.checked || sparkleAnimationToggle.checked || emojiAnimationToggle.checked) {
                     context.drawImage(overlayCanvas, 0, 0, photoCanvas.width, photoCanvas.height);
                 }
@@ -852,7 +846,7 @@
         bubbleAnimationToggle.addEventListener('change', updateAnimationState);
         heartAnimationToggle.addEventListener('change', updateAnimationState);
         sparkleAnimationToggle.addEventListener('change', updateAnimationState);
-        emojiAnimationToggle.addEventListener('change', updateAnimationState); // New event listener
+        emojiAnimationToggle.addEventListener('change', updateAnimationState);
 
         cameraSelect.addEventListener('change', () => {
             if (stream) {
