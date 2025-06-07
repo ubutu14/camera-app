@@ -111,8 +111,10 @@
             refreshIpButton.disabled = true;
 
             try {
-                // Changed to HTTPS for better security practice
-                const response = await fetch('https://ip-api.com/json/?fields=status,message,query,country,regionName,city,timezone,isp,org');
+                // Using ip-api.com for detailed information
+                // This API is free for non-commercial use, but has rate limits.
+                // For production, consider a more robust solution or self-hosting.
+                const response = await fetch('http://ip-api.com/json/?fields=status,message,query,country,regionName,city,timezone,isp,org');
                 const data = await response.json();
 
                 if (data.status === 'success') {
@@ -129,7 +131,7 @@
                     console.error('IP API Error:', data.message);
                 }
             } catch (error) {
-                errorMessage.textContent = `Failed to fetch IP information. Please check your network connection or try refreshing.`;
+                errorMessage.textContent = `Failed to fetch IP information. Please check your internet connection.`;
                 console.error('Network or API fetch error:', error);
             } finally {
                 loadingMessage.style.display = 'none';
@@ -137,7 +139,10 @@
             }
         }
 
+        // Fetch IP info when the page loads
         document.addEventListener('DOMContentLoaded', fetchIpInfo);
+
+        // Refresh button functionality
         refreshIpButton.addEventListener('click', fetchIpInfo);
     </script>
 </body>
