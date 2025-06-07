@@ -175,13 +175,21 @@
         const PLAYER_HIT_FLASH_DURATION = 10; // frames
         const NOTIFICATION_DISPLAY_TIME = 3000; // ms
 
+        // Assumed server tick rate (must match server's GAME_TICK_RATE)
+        const SERVER_TICK_RATE_MS = 1000 / 60; // 60 updates per second
+
         let defaultPlayerName = localStorage.getItem('playerName') || 'Player_' + Math.floor(Math.random() * 1000);
         playerNameInput.value = defaultPlayerName;
 
         let localPlayer = {
             id: defaultPlayerName,
-            x: canvas.width / 2,
+            x: canvas.width / 2, // Current interpolated position
             y: canvas.height / 2,
+            targetX: canvas.width / 2, // Target position from server
+            targetY: canvas.height / 2,
+            previousX: canvas.width / 2, // Position before last server update
+            previousY: canvas.height / 2,
+            lastUpdateTime: Date.now(), // Timestamp of last server update for this player
             color: `hsl(${Math.random() * 360}, 70%, 60%)`,
             health: 100,
             score: 0,
@@ -191,6 +199,7 @@
             hitFlashTimer: 0
         };
 
+        // otherPlayers will also have targetX, targetY, previousX, previousY, lastUpdateTime
         let otherPlayers = {};
         let bullets = [];
         let keys = {};
@@ -268,91 +277,148 @@
 
                 switch (message.type) {
                     case 'game_state_update':
-                        const currentPlayersIds = Object.keys(otherPlayers);
+                        const now = Date.now();
                         const newPlayersIds = Object.keys(message.players || {});
 
+                        // Process players who joined or left
+                        const currentPlayersKeys = Object.keys(otherPlayers).concat(localPlayer.id); // Include local player for tracking
                         for (const newId of newPlayersIds) {
-                            if (newId !== localPlayer.id && !currentPlayersIds.includes(newId) && message.players[newId]) {
+                            if (!currentPlayersKeys.includes(newId)) { // New player joined
                                 showNotification(`${message.players[newId].id} joined the game.`, 'info');
-                                message.players[newId]._prevHealth = message.players[newId].health;
                             }
                         }
-
-                        for (const oldId of currentPlayersIds) {
-                            if (oldId !== localPlayer.id && !newPlayersIds.includes(oldId)) {
+                        for (const oldId of currentPlayersKeys) {
+                            if (!newPlayersIds.includes(oldId) && oldId !== localPlayer.id) { // Player left
                                 showNotification(`${otherPlayers[oldId].id} left the game.`, 'warning');
                             }
                         }
 
-                        otherPlayers = message.players || {};
-                        bullets = message.bullets || [];
+                        // Update local player state from server
+                        if (message.players[localPlayer.id]) {
+                            const serverLocalPlayer = message.players[localPlayer.id];
+                            localPlayer.previousX = localPlayer.x; // Store current render position as previous
+                            localPlayer.previousY = localPlayer.y;
+                            localPlayer.targetX = serverLocalPlayer.x; // Set new target from server
+                            localPlayer.targetY = serverLocalPlayer.y;
+                            localPlayer.lastUpdateTime = now; // Mark time of this update
 
-                        if (otherPlayers[localPlayer.id]) {
-                            localPlayer.x = otherPlayers[localPlayer.id].x;
-                            localPlayer.y = otherPlayers[localPlayer.id].y;
-                            if (localPlayer.health !== otherPlayers[localPlayer.id].health) {
-                                if (localPlayer.health > otherPlayers[localPlayer.id].health) {
+                            if (localPlayer.health !== serverLocalPlayer.health) {
+                                if (localPlayer.health > serverLocalPlayer.health) {
                                     localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
                                     createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
                                 }
-                                localPlayer.health = otherPlayers[localPlayer.id].health;
+                                localPlayer.health = serverLocalPlayer.health;
                             }
-                            localPlayer.score = otherPlayers[localPlayer.id].score;
-                            delete otherPlayers[localPlayer.id];
+                            localPlayer.score = serverLocalPlayer.score;
                         }
 
-                        for (const id in otherPlayers) {
-                            if (otherPlayers[id]._prevHealth === undefined) {
-                                otherPlayers[id]._prevHealth = otherPlayers[id].health;
-                            }
+                        // Update other players state from server
+                        let updatedOtherPlayers = {};
+                        for (const id in message.players) {
+                            if (id === localPlayer.id) continue; // Skip local player, already handled
 
-                            if (otherPlayers[id].health !== otherPlayers[id]._prevHealth) {
-                                if (otherPlayers[id].health < otherPlayers[id]._prevHealth) {
-                                    otherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                    createImpactParticles(otherPlayers[id].x, otherPlayers[id].y, otherPlayers[id].color);
-                                    if (otherPlayers[id].health <= 0) {
-                                        showNotification(`${otherPlayers[id].id} was defeated!`, 'error');
-                                    } else {
-                                        showNotification(`${otherPlayers[id].id} was hit!`, 'warning', 1500);
+                            const serverPlayer = message.players[id];
+                            if (!otherPlayers[id]) {
+                                // New player, initialize
+                                updatedOtherPlayers[id] = {
+                                    id: serverPlayer.id,
+                                    x: serverPlayer.x,
+                                    y: serverPlayer.y,
+                                    targetX: serverPlayer.x,
+                                    targetY: serverPlayer.y,
+                                    previousX: serverPlayer.x,
+                                    previousY: serverPlayer.y,
+                                    lastUpdateTime: now,
+                                    color: serverPlayer.color,
+                                    health: serverPlayer.health,
+                                    score: serverPlayer.score,
+                                    hitFlashTimer: 0
+                                };
+                            } else {
+                                // Existing player, update target and previous positions
+                                const existingPlayer = otherPlayers[id];
+                                updatedOtherPlayers[id] = existingPlayer; // Keep reference to existing object
+                                existingPlayer.previousX = existingPlayer.x;
+                                existingPlayer.previousY = existingPlayer.y;
+                                existingPlayer.targetX = serverPlayer.x;
+                                existingPlayer.targetY = serverPlayer.y;
+                                existingPlayer.lastUpdateTime = now;
+
+                                if (existingPlayer.health !== serverPlayer.health) {
+                                    if (existingPlayer.health > serverPlayer.health) {
+                                        existingPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                                        createImpactParticles(existingPlayer.x, existingPlayer.y, existingPlayer.color);
+                                        if (serverPlayer.health <= 0) {
+                                            showNotification(`${serverPlayer.id} was defeated!`, 'error');
+                                        } else {
+                                            showNotification(`${serverPlayer.id} was hit!`, 'warning', 1500);
+                                        }
                                     }
                                 }
+                                existingPlayer.health = serverPlayer.health;
+                                existingPlayer.score = serverPlayer.score;
                             }
-                            otherPlayers[id]._prevHealth = otherPlayers[id].health;
                         }
+                        otherPlayers = updatedOtherPlayers;
+                        bullets = message.bullets || []; // Bullets can remain direct updates for simplicity
                         break;
-                    case 'player_hit':
+
+                    case 'player_hit': // This message type is assumed if server sends explicit hit events
+                        // This case can still be useful for immediate client-side feedback of hits
                         if (message.id === localPlayer.id) {
-                            localPlayer.health = message.newHealth;
-                            localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
-                            console.log(`Local player hit! Health: ${localPlayer.health}`);
-                            if (message.newHealth <= 0) {
-                                showNotification(`You were defeated!`, 'error');
-                            } else {
-                                showNotification(`You were hit!`, 'warning', 1500);
+                            // Local player hit logic already handled in game_state_update, but can reinforce here
+                            if (localPlayer.health > message.newHealth) { // Only if health actually decreased
+                                localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                                createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
+                                if (message.newHealth <= 0) {
+                                    showNotification(`You were defeated!`, 'error');
+                                } else {
+                                    showNotification(`You were hit!`, 'warning', 1500);
+                                }
                             }
+                            localPlayer.health = message.newHealth; // Ensure consistency
                         } else if (otherPlayers[message.id]) {
-                            otherPlayers[message.id].health = message.newHealth;
-                            otherPlayers[message.id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(otherPlayers[message.id].x, otherPlayers[message.id].y, otherPlayers[message.id].color);
-                            if (message.newHealth <= 0) {
-                                showNotification(`${otherPlayers[message.id].id} was defeated!`, 'error');
-                            } else {
-                                showNotification(`${otherPlayers[message.id].id} was hit!`, 'warning', 1500);
+                            // Other player hit logic, might be slightly delayed if game_state_update is main source
+                            const player = otherPlayers[message.id];
+                            if (player.health > message.newHealth) {
+                                player.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                                createImpactParticles(player.x, player.y, player.color);
+                                if (message.newHealth <= 0) {
+                                    showNotification(`${player.id} was defeated!`, 'error');
+                                } else {
+                                    showNotification(`${player.id} was hit!`, 'warning', 1500);
+                                }
                             }
+                            player.health = message.newHealth;
                         }
                         if (message.hitX && message.hitY) {
                             hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION });
                         }
                         break;
                     case 'player_disconnected':
+                        // This case is now redundant if game_state_update handles join/leave detection
+                        // but can be a fallback or used for specific server-sent messages
                         if (message.id && otherPlayers[message.id]) {
                             showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
+                            delete otherPlayers[message.id]; // Ensure removal
                         }
                         break;
                     case 'player_joined':
-                        if (message.player && message.player.id !== localPlayer.id) {
+                        // This case is now redundant if game_state_update handles join/leave detection
+                        if (message.player && message.player.id !== localPlayer.id && !otherPlayers[message.player.id]) {
                             showNotification(`${message.player.id} joined the game.`, 'info');
+                            // Add player to otherPlayers with initial interpolated state
+                            otherPlayers[message.player.id] = {
+                                id: message.player.id,
+                                x: message.player.x, y: message.player.y,
+                                targetX: message.player.x, targetY: message.player.y,
+                                previousX: message.player.x, previousY: message.player.y,
+                                lastUpdateTime: now,
+                                color: message.player.color,
+                                health: message.player.health,
+                                score: message.player.score,
+                                hitFlashTimer: 0
+                            };
                         }
                         break;
                 }
@@ -398,56 +464,61 @@
             }
         }
 
+        // --- Game Logic ---
         function update() {
             let movedX = 0;
             let movedY = 0;
 
             if (keys['arrowup'] || keys['w']) {
-                localPlayer.y -= PLAYER_SPEED;
                 movedY = -PLAYER_SPEED;
             }
             if (keys['arrowdown'] || keys['s']) {
-                localPlayer.y += PLAYER_SPEED;
                 movedY = PLAYER_SPEED;
             }
             if (keys['arrowleft'] || keys['a']) {
-                localPlayer.x -= PLAYER_SPEED;
                 movedX = -PLAYER_SPEED;
             }
             if (keys['arrowright'] || keys['d']) {
-                localPlayer.x += PLAYER_SPEED;
                 movedX = PLAYER_SPEED;
             }
 
-            localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
-            localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
-
+            // Send movement input to server
+            // Client no longer directly updates localPlayer.x/y for movement
             if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
+                ws.send(JSON.stringify({ type: 'player_input', id: localPlayer.id, dx: movedX, dy: movedY }));
             }
 
+            // Handle shooting
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
                 localPlayer.lastShotTime = Date.now();
 
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
-                const bullet = {
-                    id: 'bullet_' + Math.random().toString(36).substr(2, 9),
-                    ownerId: localPlayer.id,
-                    x: localPlayer.x,
-                    y: localPlayer.y,
-                    dirX: 0,
-                    dirY: -1,
-                    color: localPlayer.color,
-                    life: BULLET_LIFETIME
-                };
-                bullets.push(bullet);
-
+                // Send shoot action to server (server will create the bullet)
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: bullet.dirX, bulletDirY: bullet.dirY }));
+                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 })); // Always shoot up for now
                 }
             }
 
+            // --- Interpolate Player Positions ---
+            const now = Date.now();
+            const playersToInterpolate = [localPlayer].concat(Object.values(otherPlayers));
+
+            playersToInterpolate.forEach(player => {
+                const timeSinceLastUpdate = now - player.lastUpdateTime;
+                // Clamp interpolation factor to 1 to prevent overshooting if update is delayed
+                const interpolationFactor = Math.min(1, timeSinceLastUpdate / SERVER_TICK_RATE_MS);
+
+                player.x = player.previousX + (player.targetX - player.previousX) * interpolationFactor;
+                player.y = player.previousY + (player.targetY - player.previousY) * interpolationFactor;
+
+                // Ensure player stays within canvas bounds after interpolation
+                player.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, player.x));
+                player.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, player.y));
+            });
+
+
+            // Update bullets (still direct updates, interpolation for bullets is more complex)
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.x += bullet.dirX * BULLET_SPEED;
@@ -461,6 +532,7 @@
                 }
             }
 
+            // Update visual effects
             for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
                 muzzleFlashes[i].timer--;
                 if (muzzleFlashes[i].timer <= 0) {
@@ -520,6 +592,7 @@
                 ctx.restore();
             });
 
+            // Draw other players
             for (const id in otherPlayers) {
                 const player = otherPlayers[id];
                 ctx.beginPath();
@@ -541,6 +614,7 @@
                 ctx.fillText(`${player.id} (Score: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 10);
             }
 
+            // Draw local player
             ctx.beginPath();
             ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = localPlayer.color;
@@ -679,11 +753,8 @@
 
         // --- Prevent Page Refresh/Leaving ---
         window.addEventListener('beforeunload', (event) => {
-            // Cancel the event as stated by the standard.
             event.preventDefault();
-            // Chrome requires returnValue to be set.
             event.returnValue = '';
-            // Most browsers will display a generic message, but some might use this string.
             return 'Are you sure you want to leave? Your game session will be lost.';
         });
     </script>
