@@ -55,6 +55,20 @@ wss.on('connection', ws => {
                     console.log(`Player ${playerId} joined.`);
                     break;
 
+                    case 'player_input': // NEW MESSAGE TYPE FOR MOVEMENT
+                    if (playerId && players[playerId]) {
+                        const player = players[playerId];
+                        const dx = parsedMessage.dx;
+                        const dy = parsedMessage.dy;
+                        // Apply movement on the server
+                        player.x += dx;
+                        player.y += dy;
+                        // Clamp player position to canvas bounds (server-side validation)
+                        player.x = Math.max(PLAYER_RADIUS, Math.min(800 - PLAYER_RADIUS, player.x));
+                        player.y = Math.max(PLAYER_RADIUS, Math.min(600 - PLAYER_RADIUS, player.y));
+                    }
+                    break;
+
                 case 'player_move':
                     if (playerId && players[playerId]) {
                         // Server-side validation and update
