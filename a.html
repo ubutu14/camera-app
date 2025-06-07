@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的响应式网站 - 动画版</title>
+    <link rel="stylesheet" href="a.css"> <!-- 修改这里 -->
+</head>
+<body>
+
+    <header>
+        <h1 class="fade-in-down">欢迎来到我的网站</h1>
+        <nav>
+            <ul>
+                <li><a href="#home">首页</a></li>
+                <li><a href="#about">关于我们</a></li>
+                <li><a href="#services">服务</a></li>
+                <li><a href="#contact">联系我们</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <!-- 添加 animated-section 类 -->
+        <section id="home" class="animated-section">
+            <h2>首页内容</h2>
+            <p>这是网站的首页，提供一些基本信息。</p>
+        </section>
+
+        <!-- 添加 animated-section 类 -->
+        <section id="about" class="animated-section">
+            <h2>关于我们</h2>
+            <p>我们致力于提供高质量的服务和产品。</p>
+        </section>
+
+        <!-- 添加 animated-section 类 -->
+        <section id="services" class="animated-section">
+            <h2>我们的服务</h2>
+            <ul>
+                <li>网页设计</li>
+                <li>SEO优化</li>
+                <li>内容创作</li>
+            </ul>
+        </section>
+
+        <!-- 添加 animated-section 类 -->
+        <section id="contact" class="animated-section">
+            <h2>联系我们</h2>
+            <form action="#" method="POST">
+                <label for="name">姓名:</label><br>
+                <input type="text" id="name" name="name" required><br><br>
+
+                <label for="email">邮箱:</label><br>
+                <input type="email" id="email" name="email" required><br><br>
+
+                <label for="message">留言:</label><br>
+                <textarea id="message" name="message" rows="5" required></textarea><br><br>
+
+                <button type="submit">发送消息</button>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 我的网站. 版权所有。</p>
+    </footer>
+
+    <script src="a.js"></script> <!-- 修改这里 -->
+</body>
+</html>
