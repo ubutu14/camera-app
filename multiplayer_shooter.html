@@ -58,10 +58,30 @@
             margin-top: 15px;
             font-size: 0.9em;
         }
+        .game-controls {
+            margin-bottom: 10px;
+        }
+        .game-controls button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            vertical-align: middle;
+        }
+        .game-controls button:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
     <h1>Multiplayer 2D Shooter (Client Demo)</h1>
+    <div class="game-controls">
+        <button id="fullscreenButton">Toggle Fullscreen</button>
+    </div>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div class="info-panel">
         <h2>Game Status: <span id="connectionStatus" class="disconnected">Disconnected</span></h2>
@@ -81,6 +101,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const connectionStatusSpan = document.getElementById('connectionStatus');
+        const fullscreenButton = document.getElementById('fullscreenButton'); // New element
 
         const PLAYER_SPEED = 3;
         const BULLET_SPEED = 10;
@@ -92,28 +113,26 @@
         const PLAYER_HIT_FLASH_DURATION = 10; // frames
 
         let localPlayer = {
-            id: 'player_' + Math.random().toString(36).substr(2, 9), // Unique ID for this client
+            id: 'player_' + Math.random().toString(36).substr(2, 9),
             x: canvas.width / 2,
             y: canvas.height / 2,
             color: `hsl(${Math.random() * 360}, 70%, 60%)`,
             health: 100,
             score: 0,
             lastShotTime: 0,
-            shootCooldown: 200, // ms
-            muzzleFlashTimer: 0, // New: for muzzle flash effect
-            hitFlashTimer: 0 // New: for player hit flash effect
+            shootCooldown: 200,
+            muzzleFlashTimer: 0,
+            hitFlashTimer: 0
         };
 
         let otherPlayers = {};
         let bullets = [];
         let keys = {};
 
-        // New arrays for visual effects
         let muzzleFlashes = [];
         let hitMarkers = [];
-        let particles = []; // For impact particles
+        let particles = [];
 
-        // --- Particle Class ---
         class Particle {
             constructor(x, y, color, size, speedX, speedY, life) {
                 this.x = x;
@@ -146,11 +165,10 @@
             }
         }
 
-        // --- Network Simulation (Placeholder for WebSocket) ---
         let ws;
 
         function connectToServer() {
-            const WEBSOCKET_URL = 'wss://shooter.ubutu.dpdns.org'; // Your deployed server URL
+            const WEBSOCKET_URL = 'wss://shooter.ubutu.dpdns.org';
 
             ws = new WebSocket(WEBSOCKET_URL);
 
@@ -172,20 +190,17 @@
                         if (otherPlayers[localPlayer.id]) {
                             localPlayer.x = otherPlayers[localPlayer.id].x;
                             localPlayer.y = otherPlayers[localPlayer.id].y;
-                            // Only update health/score if they changed, to avoid flickering
                             if (localPlayer.health !== otherPlayers[localPlayer.id].health) {
                                 if (localPlayer.health > otherPlayers[localPlayer.id].health) {
-                                    // Local player was hit! Trigger visual feedback.
                                     localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
                                     createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
                                 }
                                 localPlayer.health = otherPlayers[localPlayer.id].health;
                             }
                             localPlayer.score = otherPlayers[localPlayer.id].score;
-                            delete otherPlayers[localPlayer.id]; // Remove local player from others list
+                            delete otherPlayers[localPlayer.id];
                         }
 
-                        // Handle hit flashes for other players
                         for (const id in otherPlayers) {
                             if (otherPlayers[id].health !== (otherPlayers[id]._prevHealth || otherPlayers[id].health)) {
                                 if (otherPlayers[id].health < (otherPlayers[id]._prevHealth || otherPlayers[id].health)) {
@@ -193,28 +208,20 @@
                                     createImpactParticles(otherPlayers[id].x, otherPlayers[id].y, otherPlayers[id].color);
                                 }
                             }
-                            otherPlayers[id]._prevHealth = otherPlayers[id].health; // Store previous health
+                            otherPlayers[id]._prevHealth = otherPlayers[id].health;
                         }
-
-                        // Remove bullets that have hit (if server sends hit events)
-                        // This demo relies on server sending bullet state directly, so client just renders what it gets.
-                        // For more precise hit markers, server would need to send 'bullet_hit' events.
                         break;
                     case 'player_hit':
-                        // This message type is assumed from previous server conceptual code
-                        // It would be sent by the server to specific client when *their* player is hit.
                         if (message.id === localPlayer.id) {
                             localPlayer.health = message.newHealth;
-                            localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION; // Trigger hit flash
-                            createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color); // Create particles
+                            localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                            createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
                             console.log(`Local player hit! Health: ${localPlayer.health}`);
                         } else if (otherPlayers[message.id]) {
-                            // If another player was hit
                             otherPlayers[message.id].health = message.newHealth;
                             otherPlayers[message.id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
                             createImpactParticles(otherPlayers[message.id].x, otherPlayers[message.id].y, otherPlayers[message.id].color);
                         }
-                        // Create a hit marker at the location where the hit occurred (if provided by server)
                         if (message.hitX && message.hitY) {
                             hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION });
                         }
@@ -239,7 +246,6 @@
 
         document.addEventListener('DOMContentLoaded', connectToServer);
 
-        // --- Effect Creators ---
         function createMuzzleFlash(x, y, color) {
             muzzleFlashes.push({ x, y, color, timer: MUZZLE_FLASH_DURATION });
         }
@@ -252,8 +258,7 @@
                 const speedX = Math.cos(angle) * speed;
                 const speedY = Math.sin(angle) * speed;
                 const size = Math.random() * 2 + 1;
-                const life = Math.random() * 30 + 20; // 20-50 frames
-                // Vary color slightly for effect
+                const life = Math.random() * 30 + 20;
                 const r = parseInt(baseColor.substring(4, 7));
                 const g = parseInt(baseColor.substring(8, 11));
                 const b = parseInt(baseColor.substring(12, 15));
@@ -262,25 +267,23 @@
             }
         }
 
-
-        // --- Game Logic ---
         function update() {
             let movedX = 0;
             let movedY = 0;
 
-            if (keys['ArrowUp'] || keys['w']) {
+            if (keys['arrowup'] || keys['w']) {
                 localPlayer.y -= PLAYER_SPEED;
                 movedY = -PLAYER_SPEED;
             }
-            if (keys['ArrowDown'] || keys['s']) {
+            if (keys['arrowdown'] || keys['s']) {
                 localPlayer.y += PLAYER_SPEED;
                 movedY = PLAYER_SPEED;
             }
-            if (keys['ArrowLeft'] || keys['a']) {
+            if (keys['arrowleft'] || keys['a']) {
                 localPlayer.x -= PLAYER_SPEED;
                 movedX = -PLAYER_SPEED;
             }
-            if (keys['ArrowRight'] || keys['d']) {
+            if (keys['arrowright'] || keys['d']) {
                 localPlayer.x += PLAYER_SPEED;
                 movedX = PLAYER_SPEED;
             }
@@ -292,10 +295,10 @@
                 ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
             }
 
+            // Spacebar handling
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
                 localPlayer.lastShotTime = Date.now();
 
-                // Trigger muzzle flash
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
                 const bullet = {
@@ -315,7 +318,6 @@
                 }
             }
 
-            // Update local bullets (for client-side prediction)
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.x += bullet.dirX * BULLET_SPEED;
@@ -329,7 +331,6 @@
                 }
             }
 
-            // Update muzzle flashes
             for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
                 muzzleFlashes[i].timer--;
                 if (muzzleFlashes[i].timer <= 0) {
@@ -337,7 +338,6 @@
                 }
             }
 
-            // Update hit markers
             for (let i = hitMarkers.length - 1; i >= 0; i--) {
                 hitMarkers[i].timer--;
                 if (hitMarkers[i].timer <= 0) {
@@ -345,14 +345,12 @@
                 }
             }
 
-            // Update particles
             for (let i = particles.length - 1; i >= 0; i--) {
                 if (!particles[i].update()) {
                     particles.splice(i, 1);
                 }
             }
 
-            // Update player hit flash timers
             if (localPlayer.hitFlashTimer > 0) {
                 localPlayer.hitFlashTimer--;
             }
@@ -366,43 +364,39 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw bullets (from server state or local prediction)
             bullets.forEach(bullet => {
                 ctx.beginPath();
                 ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
                 ctx.fillStyle = bullet.color;
                 ctx.fill();
 
-                // Draw bullet trail (simple line behind)
-                const trailLength = BULLET_SPEED * 2; // Adjust for longer/shorter trails
+                const trailLength = BULLET_SPEED * 2;
                 ctx.beginPath();
                 ctx.moveTo(bullet.x, bullet.y);
                 ctx.lineTo(bullet.x - bullet.dirX * trailLength, bullet.y - bullet.dirY * trailLength);
-                ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`; // White fading trail
+                ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
                 ctx.lineWidth = 1;
                 ctx.stroke();
             });
 
-            // Draw muzzle flashes
             muzzleFlashes.forEach(flash => {
                 const opacity = flash.timer / MUZZLE_FLASH_DURATION;
                 ctx.save();
                 ctx.globalAlpha = opacity;
-                ctx.fillStyle = `rgba(255, 255, 0, ${opacity})`; // Yellowish flash
+                ctx.fillStyle = `rgba(255, 255, 0, ${opacity})`;
                 ctx.beginPath();
-                ctx.arc(flash.x, flash.y, PLAYER_RADIUS * 0.8 * (1 - opacity) + PLAYER_RADIUS * 0.5, 0, Math.PI * 2); // Grow and fade
+                ctx.arc(flash.x, flash.y, PLAYER_RADIUS * 0.8 * (1 - opacity) + PLAYER_RADIUS * 0.5, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             });
 
-            // Draw other players
             for (const id in otherPlayers) {
                 const player = otherPlayers[id];
                 ctx.beginPath();
                 ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
                 ctx.fillStyle = player.color;
                 ctx.fill();
-                ctx.strokeStyle = player.hitFlashTimer > 0 ? 'red' : 'white'; // Flash red when hit
+                ctx.strokeStyle = player.hitFlashTimer > 0 ? 'red' : 'white';
                 ctx.lineWidth = player.hitFlashTimer > 0 ? 4 : 2;
                 ctx.stroke();
 
@@ -417,13 +411,12 @@
                 ctx.fillText(player.id.substring(0, 8), player.x, player.y + PLAYER_RADIUS + 10);
             }
 
-            // Draw local player
             ctx.beginPath();
             ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = localPlayer.color;
             ctx.fill();
-            ctx.strokeStyle = localPlayer.hitFlashTimer > 0 ? 'red' : 'gold'; // Flash red when hit, otherwise gold
-            ctx.lineWidth = localPlayer.hitFlashTimer > 0 ? 5 : 3; // Thicker border when hit
+            ctx.strokeStyle = localPlayer.hitFlashTimer > 0 ? 'red' : 'gold';
+            ctx.lineWidth = localPlayer.hitFlashTimer > 0 ? 5 : 3;
             ctx.stroke();
 
             ctx.fillStyle = 'red';
@@ -436,12 +429,11 @@
             ctx.textAlign = 'center';
             ctx.fillText(`You (${localPlayer.id.substring(0, 8)}) Score: ${localPlayer.score}`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
 
-            // Draw hit markers
             hitMarkers.forEach(marker => {
                 const opacity = marker.timer / HIT_MARKER_DURATION;
                 ctx.save();
                 ctx.globalAlpha = opacity;
-                ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`; // White cross
+                ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
                 ctx.lineWidth = 2;
                 const size = 10;
                 ctx.beginPath();
@@ -453,11 +445,9 @@
                 ctx.restore();
             });
 
-            // Draw particles
             particles.forEach(p => p.draw(ctx));
         }
 
-        // --- Game Loop ---
         function gameLoop() {
             update();
             draw();
@@ -466,12 +456,73 @@
         gameLoop();
 
         // --- Input Handling ---
+        // Prevent default browser scrolling when spacebar is pressed
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
+            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault(); // Prevent default action (like scrolling)
+            }
         });
 
         window.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
+        });
+
+        // --- Fullscreen Toggle ---
+        fullscreenButton.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                // Request fullscreen for the canvas element
+                if (canvas.requestFullscreen) {
+                    canvas.requestFullscreen();
+                } else if (canvas.mozRequestFullScreen) { /* Firefox */
+                    canvas.mozRequestFullScreen();
+                } else if (canvas.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                    canvas.webkitRequestFullscreen();
+                } else if (canvas.msRequestFullscreen) { /* IE/Edge */
+                    canvas.msRequestFullscreen();
+                }
+            } else {
+                // Exit fullscreen
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) { /* Firefox */
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE/Edge */
+                    document.msExitFullscreen();
+                }
+            }
+        });
+
+        // Optional: Listen for fullscreen change to update button text or other UI
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Toggle Fullscreen';
+            }
+        });
+        document.addEventListener('mozfullscreenchange', () => { /* Firefox */
+            if (document.mozFullScreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Toggle Fullscreen';
+            }
+        });
+        document.addEventListener('webkitfullscreenchange', () => { /* Chrome, Safari & Opera */
+            if (document.webkitFullscreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Toggle Fullscreen';
+            }
+        });
+        document.addEventListener('msfullscreenchange', () => { /* IE/Edge */
+            if (document.msFullscreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Toggle Fullscreen';
+            }
         });
     </script>
 </body>
