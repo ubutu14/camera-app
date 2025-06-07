@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer 2D Shooter (Client)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #222;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        canvas {
+            background-color: #333;
+            border: 2px solid #555;
+            display: block;
+            margin-bottom: 20px;
+        }
+        .info-panel {
+            background-color: #444;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            text-align: left;
+            max-width: 600px;
+            width: 100%;
+        }
+        .info-panel h2 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .info-panel p {
+            margin-bottom: 5px;
+        }
+        .info-panel code {
+            background-color: #555;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .status {
+            color: yellow;
+        }
+        .disconnected {
+            color: red;
+        }
+        .connected {
+            color: limegreen;
+        }
+        .controls-info {
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Multiplayer 2D Shooter (Client Demo)</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="info-panel">
+        <h2>Game Status: <span id="connectionStatus" class="disconnected">Disconnected</span></h2>
+        <p>This is a **client-side demonstration** of a multiplayer game concept.</p>
+        <p>It simulates sending and receiving game state updates via WebSockets.</p>
+        <p>A **real multiplayer game** requires a dedicated **server** (e.g., Node.js, Python, Go) to manage game logic, player synchronization, and communication between all clients.</p>
+        <p class="controls-info"><strong>Controls:</strong>
+            <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd>
+            <br>Shoot: <kbd>Spacebar</kbd>
+        </p>
+        <p>Go back to <a href="index.html">Photo Booth</a></p>
+        <p>Go to <a href="record.html">Video and Audio Recorder</a></p>
+        <p>Go to <a href="ip_check.html">IP Status Information</a></p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const connectionStatusSpan = document.getElementById('connectionStatus');
+
+        const PLAYER_SPEED = 3;
+        const BULLET_SPEED = 10;
+        const PLAYER_RADIUS = 15;
+        const BULLET_RADIUS = 3;
+        const BULLET_LIFETIME = 60; // frames
+
+        let localPlayer = {
+            id: 'player_' + Math.random().toString(36).substr(2, 9), // Unique ID for this client
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+            health: 100,
+            score: 0,
+            lastShotTime: 0,
+            shootCooldown: 200 // ms
+        };
+
+        let otherPlayers = {}; // Stores other players' states received from server
+        let bullets = []; // Stores bullets (both local and from others, if server sends them)
+
+        let keys = {}; // To track pressed keys for continuous movement
+
+        // --- Network Simulation (Placeholder for WebSocket) ---
+        let ws; // WebSocket object
+
+        function connectToServer() {
+            // In a real game, replace 'ws://localhost:8080' with your actual server address
+            // For a deployed game, it might be 'wss://your-game-server.com/websocket'
+            ws = new WebSocket('ws://localhost:8080'); // This will likely fail without a local server
+
+            ws.onopen = () => {
+                console.log('Connected to WebSocket server.');
+                connectionStatusSpan.textContent = 'Connected';
+                connectionStatusSpan.className = 'connected';
+                // Send initial player data to server
+                ws.send(JSON.stringify({ type: 'player_join', player: localPlayer }));
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                // console.log('Received:', message); // Uncomment for debugging
+
+                switch (message.type) {
+                    case 'game_state_update':
+                        // Update other players and bullets based on server's authoritative state
+                        otherPlayers = message.players || {};
+                        bullets = message.bullets || [];
+
+                        // Ensure local player's state is consistent with server's if needed
+                        // (e.g., server might correct position, health, score)
+                        if (otherPlayers[localPlayer.id]) {
+                            localPlayer.x = otherPlayers[localPlayer.id].x;
+                            localPlayer.y = otherPlayers[localPlayer.id].y;
+                            localPlayer.health = otherPlayers[localPlayer.id].health;
+                            localPlayer.score = otherPlayers[localPlayer.id].score;
+                            // Delete local player from otherPlayers to avoid drawing twice
+                            delete otherPlayers[localPlayer.id];
+                        }
+                        break;
+                    case 'player_hit':
+                        // Example: server tells us our player was hit
+                        if (message.id === localPlayer.id) {
+                            localPlayer.health = message.newHealth;
+                            console.log(`Local player hit! Health: ${localPlayer.health}`);
+                        }
+                        break;
+                    // Add more message types for chat, power-ups, etc.
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('Disconnected from WebSocket server. Attempting to reconnect in 3s...');
+                connectionStatusSpan.textContent = 'Disconnected';
+                connectionStatusSpan.className = 'disconnected';
+                setTimeout(connectToServer, 3000); // Attempt to reconnect
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                connectionStatusSpan.textContent = 'Error';
+                connectionStatusSpan.className = 'disconnected';
+                ws.close(); // Force close to trigger onclose and reconnect logic
+            };
+        }
+
+        // Call connectToServer when the page loads
+        document.addEventListener('DOMContentLoaded', connectToServer);
+
+        // --- Game Logic ---
+
+        function update() {
+            // Local player movement (client-side prediction)
+            let movedX = 0;
+            let movedY = 0;
+
+            if (keys['ArrowUp'] || keys['w']) {
+                localPlayer.y -= PLAYER_SPEED;
+                movedY = -PLAYER_SPEED;
+            }
+            if (keys['ArrowDown'] || keys['s']) {
+                localPlayer.y += PLAYER_SPEED;
+                movedY = PLAYER_SPEED;
+            }
+            if (keys['ArrowLeft'] || keys['a']) {
+                localPlayer.x -= PLAYER_SPEED;
+                movedX = -PLAYER_SPEED;
+            }
+            if (keys['ArrowRight'] || keys['d']) {
+                localPlayer.x += PLAYER_SPEED;
+                movedX = PLAYER_SPEED;
+            }
+
+            // Keep player within canvas bounds
+            localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
+            localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
+
+            // Send movement update to server
+            if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
+                ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
+            }
+
+            // Handle shooting
+            if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
+                localPlayer.lastShotTime = Date.now();
+                // In a real game, this would be sent to the server, which then creates the bullet
+                // For this demo, we'll just simulate a local bullet
+                const bullet = {
+                    id: 'bullet_' + Math.random().toString(36).substr(2, 9),
+                    ownerId: localPlayer.id,
+                    x: localPlayer.x,
+                    y: localPlayer.y,
+                    dirX: 0, // Direction will be determined by facing or mouse position
+                    dirY: -1, // For simplicity, always shoot upwards in this demo
+                    color: localPlayer.color,
+                    life: BULLET_LIFETIME
+                };
+                bullets.push(bullet); // Add locally for client-side prediction
+
+                // Send shoot action to server
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: bullet.dirX, bulletDirY: bullet.dirY }));
+                }
+            }
+
+            // Update local bullets (for client-side prediction)
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.x += bullet.dirX * BULLET_SPEED;
+                bullet.y += bullet.dirY * BULLET_SPEED;
+                bullet.life--;
+
+                // Remove bullets that are out of bounds or expired
+                if (bullet.life <= 0 ||
+                    bullet.x < 0 || bullet.x > canvas.width ||
+                    bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+            // Draw bullets (from server state or local prediction)
+            bullets.forEach(bullet => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = bullet.color;
+                ctx.fill();
+            });
+
+            // Draw other players
+            for (const id in otherPlayers) {
+                const player = otherPlayers[id];
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = player.color;
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw health bar for other players
+                ctx.fillStyle = 'red';
+                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
+                ctx.fillStyle = 'lime';
+                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (player.health / 100), 5);
+
+                // Draw ID
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(player.id.substring(0, 8), player.x, player.y + PLAYER_RADIUS + 10);
+            }
+
+            // Draw local player
+            ctx.beginPath();
+            ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = localPlayer.color;
+            ctx.fill();
+            ctx.strokeStyle = 'gold'; // Highlight local player
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw local player health bar
+            ctx.fillStyle = 'red';
+            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
+            ctx.fillStyle = 'lime';
+            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (localPlayer.health / 100), 5);
+
+            // Draw local player ID and score
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`You (${localPlayer.id.substring(0, 8)}) Score: ${localPlayer.score}`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
+        }
+
+        // --- Game Loop ---
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop(); // Start the game loop
+
+        // --- Input Handling ---
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+    </script>
+</body>
+</html>
