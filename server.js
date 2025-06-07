@@ -1,12 +1,10 @@
-// server.js (Complete, Updated Node.js code - for your actual server)
+// server.js (The complete and correct version for your game)
 
-const WebSocket = require('ws'); // You'd install this via npm: npm install ws
+const WebSocket = require('ws');
 const http = require('http');
 
-// Create a simple HTTP server (optional, but good practice for health checks or serving static files)
 const server = http.createServer((req, res) => {
-    // You might serve your multiplayer_shooter.html here, or have your client
-    // served by a separate static hosting service (like Netlify/Vercel)
+    // A simple HTTP response for health checks or if someone tries to browse directly
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Multiplayer Game Server is Running!');
 });
@@ -22,7 +20,7 @@ const PLAYER_SPEED = 3; // IMPORTANT: This must be consistent with client's PLAY
 const BULLET_SPEED = 10;
 const PLAYER_RADIUS = 15;
 const BULLET_RADIUS = 3;
-const BULLET_LIFETIME = 60; // frames
+const BULLET_LIFETIME = 60; // frames (adjust if your client's bullet lifetime is different)
 const MAX_HEALTH = 100;
 
 let nextBulletId = 0; // Simple ID counter for bullets
@@ -35,37 +33,48 @@ wss.on('connection', ws => {
     ws.on('message', message => {
         try {
             const parsedMessage = JSON.parse(message);
+            // console.log('Server received:', parsedMessage); // Uncomment for server-side debugging
 
             switch (parsedMessage.type) {
                 case 'player_join':
-                    // Assign a unique ID if client didn't provide one, or use client's preferred ID
-                    // (Server should ultimately decide the unique ID to prevent conflicts)
+                    // Assign a unique ID. If client's preferred ID already exists, make it unique.
                     playerId = parsedMessage.player.id;
-                    if (players[playerId]) { // If ID already exists, append a random string
-                        playerId = `${parsedMessage.player.id}_${Math.random().toString(36).substr(2, 4)}`;
+                    let originalPlayerId = playerId;
+                    let counter = 1;
+                    while (players[playerId]) { // Check if ID already exists on server
+                        playerId = `${originalPlayerId}_${counter++}`;
                     }
-
+                    
                     players[playerId] = {
-                        id: playerId, // Use the potentially adjusted ID
+                        id: playerId, // Use the potentially adjusted unique ID
                         x: parsedMessage.player.x,
                         y: parsedMessage.player.y,
                         color: parsedMessage.player.color,
-                        health: MAX_HEALTH,
+                        health: MAX_HEALTH, // Always start with full health on server
                         score: 0
                     };
                     console.log(`Player ${playerId} joined.`);
                     // Send back the confirmed player ID to the client if it was adjusted
                     ws.send(JSON.stringify({ type: 'player_id_confirmed', id: playerId }));
+                    
+                    // Notify other players that a new player joined
+                    wss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN && client !== ws) {
+                            client.send(JSON.stringify({ type: 'player_joined', player: players[playerId] }));
+                        }
+                    });
                     break;
 
-                // --- NEW: Handle player input for movement ---
+                // --- THIS IS THE CRITICAL PART FOR MOVEMENT ---
                 case 'player_input':
                     if (playerId && players[playerId]) {
                         const player = players[playerId];
                         const dx = parsedMessage.dx; // Direction X from client
                         const dy = parsedMessage.dy; // Direction Y from client
 
-                        // Apply movement on the server based on game rules
+                        // Apply movement on the server based on game rules and PLAYER_SPEED
+                        // Note: This is simplified. In a real game, you'd calculate based on time
+                        // and ensure client inputs don't allow "speed hacks".
                         player.x += dx;
                         player.y += dy;
 
@@ -91,8 +100,6 @@ wss.on('connection', ws => {
                         };
                     }
                     break;
-
-                // Add more message handlers for other player actions
             }
         } catch (error) {
             console.error('Failed to parse message or handle:', error);
@@ -102,14 +109,14 @@ wss.on('connection', ws => {
     ws.on('close', () => {
         if (playerId) {
             delete players[playerId];
-            // Also remove any bullets owned by this player that are still active
+            // Remove any bullets owned by this player that are still active
             for (const bulletId in bullets) {
                 if (bullets[bulletId].ownerId === playerId) {
                     delete bullets[bulletId];
                 }
             }
             console.log(`Player ${playerId} disconnected.`);
-            // Optionally, broadcast to other clients that a player disconnected
+            // Broadcast to other clients that a player disconnected
             wss.clients.forEach(client => {
                 if (client.readyState === WebSocket.OPEN && client !== ws) {
                     client.send(JSON.stringify({ type: 'player_disconnected', id: playerId }));
@@ -137,7 +144,7 @@ setInterval(() => {
             bullet.x < 0 || bullet.x > 800 || // Assuming 800x600 canvas
             bullet.y < 0 || bullet.y > 600) {
             delete bullets[bulletId];
-            continue; // Move to next bullet
+            continue;
         }
 
         // 2. Collision Detection (Bullet vs. Player)
@@ -159,18 +166,18 @@ setInterval(() => {
                     players[bullet.ownerId].score += 10;
                 }
 
-                // Send a specific 'player_hit' message to the hit player (and maybe shooter)
-                // This is good for immediate feedback and hit markers
+                // Send a specific 'player_hit' message to all clients for immediate hit markers/feedback
+                // This is important for smooth hit notifications on all clients
                 wss.clients.forEach(clientWs => {
                     if (clientWs.readyState === WebSocket.OPEN) {
-                        // Send to the hit player
-                        if (clientWs._socket.remoteAddress === players[player.id].ipAddress) { // Placeholder for actual client-to-WS mapping
-                             clientWs.send(JSON.stringify({ type: 'player_hit', id: player.id, newHealth: player.health, hitX: bullet.x, hitY: bullet.y }));
-                        }
-                        // Send to the shooter (optional, for confirmation/feedback)
-                        if (clientWs._socket.remoteAddress === players[bullet.ownerId].ipAddress) {
-                             clientWs.send(JSON.stringify({ type: 'player_hit_confirmed', targetId: player.id, score: players[bullet.ownerId].score }));
-                        }
+                        clientWs.send(JSON.stringify({
+                            type: 'player_hit',
+                            id: player.id, // ID of the player who was hit
+                            newHealth: player.health,
+                            hitX: bullet.x,
+                            hitY: bullet.y,
+                            shooterId: bullet.ownerId // Optional: ID of the player who shot
+                        }));
                     }
                 });
 
@@ -180,15 +187,14 @@ setInterval(() => {
                 // If player health drops to 0 or below
                 if (player.health <= 0) {
                     console.log(`Player ${player.id} defeated!`);
-                    // Reset player or remove them
-                    player.health = MAX_HEALTH; // Simple respawn
+                    // Reset player health and respawn them
+                    player.health = MAX_HEALTH;
                     player.x = Math.random() * 800; // Respawn at random location
                     player.y = Math.random() * 600;
-                    // Optionally, broadcast a 'player_defeated' message
+                    // You could also broadcast a 'player_defeated' message here if you want specific handling
                 }
 
-                // Break from inner loop as bullet is gone
-                break;
+                break; // Break from inner loop as bullet is gone
             }
         }
     }
