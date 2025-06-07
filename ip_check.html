@@ -32,16 +32,20 @@
         }
         #ip-info {
             background-color: #e9ecef;
-            border: 1px solid #ced4da;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
             padding: 20px;
             margin-top: 20px;
-            border-radius: 5px;
             text-align: left;
-            font-size: 1.1em;
-            color: #495057;
+            word-wrap: break-word; /* Ensure long lines break */
         }
         #ip-info p {
             margin: 8px 0;
+            font-size: 1.1em;
+            color: #495057;
+        }
+        #ip-info strong {
+            color: #007bff;
         }
         #error-message {
             color: red;
@@ -50,6 +54,8 @@
         a {
             color: #007bff;
             text-decoration: none;
+            margin-top: 20px;
+            display: inline-block;
         }
         a:hover {
             text-decoration: underline;
@@ -66,7 +72,8 @@
 
         <p id="error-message"></p>
 
-        <p style="margin-top: 20px;">Go back to <a href="index.html">Photo Booth</a></p>
+        <p>Go back to <a href="index.html">Photo Booth</a></p>
+        <p>Go to <a href="record.html">Video and Audio Recorder</a></p>
     </div>
 
     <script>
@@ -75,38 +82,34 @@
 
         async function getIpInfo() {
             try {
-                // Using ip-api.com for detailed IP information
-                const response = await fetch('http://ip-api.com/json/');
+                const response = await fetch('https://ipinfo.io/json');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
 
-                if (data.status === 'success') {
+                if (data.ip) {
                     ipInfoDiv.innerHTML = `
-                        <p><strong>IP Address:</strong> ${data.query}</p>
-                        <p><strong>Country:</strong> ${data.country} (${data.countryCode})</p>
-                        <p><strong>Region:</strong> ${data.regionName} (${data.region})</p>
-                        <p><strong>City:</strong> ${data.city}</p>
-                        <p><strong>Zip Code:</strong> ${data.zip}</p>
-                        <p><strong>Timezone:</strong> ${data.timezone}</p>
-                        <p><strong>ISP:</strong> ${data.isp}</p>
-                        <p><strong>Organization:</strong> ${data.org}</p>
-                        <p><strong>AS:</strong> ${data.as}</p>
+                        <p><strong>IP Address:</strong> ${data.ip}</p>
+                        <p><strong>City:</strong> ${data.city || 'N/A'}</p>
+                        <p><strong>Region:</strong> ${data.region || 'N/A'}</p>
+                        <p><strong>Country:</strong> ${data.country || 'N/A'}</p>
+                        <p><strong>Location (Lat/Lon):</strong> ${data.loc || 'N/A'}</p>
+                        <p><strong>Organization (ISP):</strong> ${data.org || 'N/A'}</p>
+                        <p><strong>Timezone:</strong> ${data.timezone || 'N/A'}</p>
                     `;
                 } else {
-                    ipInfoDiv.innerHTML = '<p>Failed to retrieve detailed IP information.</p>';
-                    errorMessage.textContent = `API Error: ${data.message || 'Unknown error'}`;
+                    ipInfoDiv.innerHTML = '<p>Could not retrieve IP information.</p>';
                 }
 
             } catch (error) {
-                console.error('Error fetching IP information:', error);
-                ipInfoDiv.innerHTML = '<p>Could not retrieve IP information.</p>';
-                errorMessage.textContent = `Error: ${error.message}. Please check your internet connection or try again later.`;
+                console.error('Error fetching IP info:', error);
+                errorMessage.textContent = `Failed to load IP information: ${error.message}. Please check your internet connection.`;
+                ipInfoDiv.innerHTML = '<p>Failed to load IP information.</p>';
             }
         }
 
-        // Call the function to get IP info when the page loads
+        // Call the function when the page loads
         document.addEventListener('DOMContentLoaded', getIpInfo);
     </script>
 </body>
