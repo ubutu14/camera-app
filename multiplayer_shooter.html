@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Multiplayer 2D Shooter (Client)</title>
     <style>
         body {
@@ -17,6 +17,13 @@
             margin: 0;
             padding: 20px;
             box-sizing: border-box;
+            -webkit-touch-callout: none; /* iOS Safari */
+            -webkit-user-select: none; /* Safari */
+            -khtml-user-select: none; /* Konqueror HTML */
+            -moz-user-select: none; /* Old versions of Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
+            touch-action: manipulation; /* Prevent default touch actions like double-tap zoom */
         }
         canvas {
             background-color: #333;
@@ -123,6 +130,94 @@
         .notification.success { background-color: rgba(40, 167, 69, 0.7); }
         .notification.warning { background-color: rgba(255, 193, 7, 0.7); }
         .notification.error { background-color: rgba(220, 53, 69, 0.7); }
+
+        /* Mobile Controls */
+        .mobile-controls-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px; /* Match canvas width */
+            margin-top: 20px;
+            padding: 10px 0;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            background-color: #444;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease;
+            -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on tap */
+        }
+        .d-pad button:active {
+            background-color: #0056b3;
+            transform: scale(0.95);
+        }
+        .d-pad button:hover {
+            background-color: #0056b3;
+        }
+
+        .d-pad .up { grid-area: 1 / 2 / 2 / 3; }
+        .d-pad .left { grid-area: 2 / 1 / 3 / 2; }
+        .d-pad .center { grid-area: 2 / 2 / 3 / 3; visibility: hidden; } /* Placeholder for center, hidden */
+        .d-pad .right { grid-area: 2 / 3 / 3 / 4; }
+        .d-pad .down { grid-area: 3 / 2 / 4 / 3; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-right: 20px; /* Space from right edge */
+        }
+        .action-buttons button {
+            background-color: #28a745; /* Green for shoot */
+            color: white;
+            padding: 20px 30px;
+            border: none;
+            border-radius: 50%; /* Make it circular */
+            font-size: 1.5em;
+            width: 90px;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .action-buttons button:active {
+            background-color: #218838;
+            transform: scale(0.95);
+        }
+        .action-buttons button:hover {
+            background-color: #218838;
+        }
+
+        /* Optional: Hide mobile controls on larger screens if you only want keyboard for desktop */
+        /* @media (min-width: 768px) {
+            .mobile-controls-container {
+                display: none;
+            }
+        } */
     </style>
 </head>
 <body>
@@ -142,14 +237,28 @@
 
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
+    <!-- Mobile Controls -->
+    <div class="mobile-controls-container">
+        <div class="d-pad">
+            <button id="moveUp" class="up">↑</button>
+            <button id="moveLeft" class="left">←</button>
+            <div class="center"></div> <!-- Placeholder -->
+            <button id="moveRight" class="right">→</button>
+            <button id="moveDown" class="down">↓</button>
+        </div>
+        <div class="action-buttons">
+            <button id="shootButton">SHOOT</button>
+        </div>
+    </div>
+
     <div class="info-panel">
         <h2>Game Status: <span id="connectionStatus" class="disconnected">Disconnected</span></h2>
         <p>This is a **client-side demonstration** of a multiplayer game concept.</p>
         <p>It simulates sending and receiving game state updates via WebSockets.</p>
         <p>A **real multiplayer game** requires a dedicated **server** (e.g., Node.js, Python, Go) to manage game logic, player synchronization, and communication between all clients.</p>
         <p class="controls-info"><strong>Controls:</strong>
-            <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd>
-            <br>Shoot: <kbd>Spacebar</kbd>
+            <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen D-Pad**
+            <br>Shoot: <kbd>Spacebar</kbd> / **On-screen SHOOT button**
         </p>
         <p>Go back to <a href="index.html">Photo Booth</a></p>
         <p>Go to <a href="record.html">Video and Audio Recorder</a></p>
@@ -164,6 +273,13 @@
         const playerNameInput = document.getElementById('playerNameInput');
         const setPlayerNameButton = document.getElementById('setPlayerNameButton');
         const notificationArea = document.getElementById('notification-area');
+
+        // Mobile control buttons (New)
+        const moveUpButton = document.getElementById('moveUp');
+        const moveDownButton = document.getElementById('moveDown');
+        const moveLeftButton = document.getElementById('moveLeft');
+        const moveRightButton = document.getElementById('moveRight');
+        const shootButton = document.getElementById('shootButton');
 
         const PLAYER_SPEED = 3;
         const BULLET_SPEED = 10;
@@ -193,7 +309,7 @@
 
         let otherPlayers = {};
         let bullets = [];
-        let keys = {};
+        let keys = {}; // Stores state of keyboard keys AND mobile buttons
 
         let muzzleFlashes = [];
         let hitMarkers = [];
@@ -287,6 +403,8 @@
                         otherPlayers = message.players || {};
                         bullets = message.bullets || [];
 
+                        // IMPORTANT: For localPlayer, update its position directly from server
+                        // This is the "server authoritative" update that corrects client-side prediction
                         if (otherPlayers[localPlayer.id]) {
                             localPlayer.x = otherPlayers[localPlayer.id].x;
                             localPlayer.y = otherPlayers[localPlayer.id].y;
@@ -298,9 +416,10 @@
                                 localPlayer.health = otherPlayers[localPlayer.id].health;
                             }
                             localPlayer.score = otherPlayers[localPlayer.id].score;
-                            delete otherPlayers[localPlayer.id];
+                            delete otherPlayers[localPlayer.id]; // Remove local player from otherPlayers list
                         }
 
+                        // For other players, update their health and flash timer
                         for (const id in otherPlayers) {
                             if (otherPlayers[id]._prevHealth === undefined) {
                                 otherPlayers[id]._prevHealth = otherPlayers[id].health;
@@ -348,6 +467,7 @@
                     case 'player_disconnected':
                         if (message.id && otherPlayers[message.id]) {
                             showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
+                            delete otherPlayers[message.id];
                         }
                         break;
                     case 'player_joined':
@@ -402,26 +522,31 @@
             let movedX = 0;
             let movedY = 0;
 
+            // This is the client-side prediction logic
             if (keys['arrowup'] || keys['w']) {
                 localPlayer.y -= PLAYER_SPEED;
-                movedY = -PLAYER_SPEED;
+                movedY = -PLAYER_SPEED; // Indicate movement for sending to server
             }
             if (keys['arrowdown'] || keys['s']) {
                 localPlayer.y += PLAYER_SPEED;
-                movedY = PLAYER_SPEED;
+                movedY = PLAYER_SPEED; // Indicate movement for sending to server
             }
             if (keys['arrowleft'] || keys['a']) {
                 localPlayer.x -= PLAYER_SPEED;
-                movedX = -PLAYER_SPEED;
+                movedX = -PLAYER_SPEED; // Indicate movement for sending to server
             }
             if (keys['arrowright'] || keys['d']) {
                 localPlayer.x += PLAYER_SPEED;
-                movedX = PLAYER_SPEED;
+                movedX = PLAYER_SPEED; // Indicate movement for sending to server
             }
 
+            // Clamp local player position to canvas bounds
             localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
+            // Send movement to server if character moved
+            // Note: This sends absolute position (x,y) if server is set up to receive 'player_move'
+            // If your server expects 'player_input' with dx, dy, this will need to change.
             if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
                 ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
             }
@@ -431,23 +556,13 @@
 
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
-                const bullet = {
-                    id: 'bullet_' + Math.random().toString(36).substr(2, 9),
-                    ownerId: localPlayer.id,
-                    x: localPlayer.x,
-                    y: localPlayer.y,
-                    dirX: 0,
-                    dirY: -1,
-                    color: localPlayer.color,
-                    life: BULLET_LIFETIME
-                };
-                bullets.push(bullet);
-
+                // Send shoot action to server
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: bullet.dirX, bulletDirY: bullet.dirY }));
+                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 })); // Always shoot up for now
                 }
             }
 
+            // Update bullets (client-side prediction)
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.x += bullet.dirX * BULLET_SPEED;
@@ -461,6 +576,7 @@
                 }
             }
 
+            // Update visual effects
             for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
                 muzzleFlashes[i].timer--;
                 if (muzzleFlashes[i].timer <= 0) {
@@ -585,7 +701,7 @@
         }
         gameLoop();
 
-        // --- Input Handling ---
+        // --- Input Handling (Keyboard) ---
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
             if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -596,6 +712,41 @@
         window.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
         });
+
+        // --- Mobile/Touch Controls Input Handling (New) ---
+        function addTouchAndMouseListeners(element, keyName) {
+            const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
+            const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
+            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave'; // For when finger slides off or mouse leaves
+
+            element.addEventListener(startEvent, (e) => {
+                e.preventDefault(); // Prevent scrolling/default behavior
+                keys[keyName] = true;
+                // console.log(`Button ${keyName} pressed`); // Debugging mobile input
+            }, { passive: false }); // passive: false to allow preventDefault
+
+            element.addEventListener(endEvent, (e) => {
+                e.preventDefault();
+                keys[keyName] = false;
+                // console.log(`Button ${keyName} released`); // Debugging mobile input
+            });
+
+            // Handle cases where touch/mouse leaves the button area before release
+            element.addEventListener(leaveEvent, (e) => {
+                 if (keys[keyName]) { // Only if it was previously pressed by this interaction
+                    keys[keyName] = false;
+                    // console.log(`Button ${keyName} left area, released`);
+                 }
+            });
+        }
+
+        // Attach listeners to mobile control buttons
+        addTouchAndMouseListeners(moveUpButton, 'w');
+        addTouchAndMouseListeners(moveDownButton, 's');
+        addTouchAndMouseListeners(moveLeftButton, 'a');
+        addTouchAndMouseListeners(moveRightButton, 'd');
+        addTouchAndMouseListeners(shootButton, ' ');
+
 
         // --- Fullscreen Toggle ---
         fullscreenButton.addEventListener('click', () => {
@@ -679,11 +830,8 @@
 
         // --- Prevent Page Refresh/Leaving ---
         window.addEventListener('beforeunload', (event) => {
-            // Cancel the event as stated by the standard.
             event.preventDefault();
-            // Chrome requires returnValue to be set.
             event.returnValue = '';
-            // Most browsers will display a generic message, but some might use this string.
             return 'Are you sure you want to leave? Your game session will be lost.';
         });
     </script>
