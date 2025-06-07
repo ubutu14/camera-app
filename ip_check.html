@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IP Status Check</title>
+    <title>IP Status Information</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -31,42 +31,28 @@
             margin-bottom: 20px;
         }
         #ip-info {
-            margin-top: 20px;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
             padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: #f9f9f9;
+            margin-top: 20px;
+            border-radius: 5px;
             text-align: left;
+            font-size: 1.1em;
+            color: #495057;
         }
         #ip-info p {
             margin: 8px 0;
-        }
-        #ip-info strong {
-            display: inline-block;
-            width: 120px; /* Align labels */
-        }
-        #loading-message {
-            color: #007bff;
-            margin-top: 20px;
-            font-size: 1.1em;
         }
         #error-message {
             color: red;
             margin-top: 10px;
         }
-        button {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            margin: 5px;
-            vertical-align: middle;
+        a {
+            color: #007bff;
+            text-decoration: none;
         }
-        button:hover {
-            background-color: #0056b3;
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -74,76 +60,54 @@
     <div class="container">
         <h1>Your IP Status Information</h1>
 
-        <div id="loading-message">Fetching IP information...</div>
-        <div id="ip-info" style="display: none;">
-            <p><strong>IP Address:</strong> <span id="ip-address"></span></p>
-            <p><strong>Country:</strong> <span id="country"></span></p>
-            <p><strong>Region:</strong> <span id="region"></span></p>
-            <p><strong>City:</strong> <span id="city"></span></p>
-            <p><strong>Timezone:</strong> <span id="timezone"></span></p>
-            <p><strong>ISP:</strong> <span id="isp"></span></p>
-            <p><strong>Organization:</strong> <span id="org"></span></p>
+        <div id="ip-info">
+            <p>Loading IP information...</p>
         </div>
+
         <p id="error-message"></p>
 
-        <button id="refresh-ip">Refresh IP Info</button>
-
-        <p>Go back to <a href="index.html">Photo Booth</a></p>
+        <p style="margin-top: 20px;">Go back to <a href="index.html">Photo Booth</a></p>
     </div>
 
     <script>
         const ipInfoDiv = document.getElementById('ip-info');
-        const ipAddressSpan = document.getElementById('ip-address');
-        const countrySpan = document.getElementById('country');
-        const regionSpan = document.getElementById('region');
-        const citySpan = document.getElementById('city');
-        const timezoneSpan = document.getElementById('timezone');
-        const ispSpan = document.getElementById('isp');
-        const orgSpan = document.getElementById('org');
-        const loadingMessage = document.getElementById('loading-message');
         const errorMessage = document.getElementById('error-message');
-        const refreshIpButton = document.getElementById('refresh-ip');
 
-        async function fetchIpInfo() {
-            loadingMessage.style.display = 'block';
-            ipInfoDiv.style.display = 'none';
-            errorMessage.textContent = '';
-            refreshIpButton.disabled = true;
-
+        async function getIpInfo() {
             try {
-                // Using ip-api.com for detailed information
-                // This API is free for non-commercial use, but has rate limits.
-                // For production, consider a more robust solution or self-hosting.
-                const response = await fetch('http://ip-api.com/json/?fields=status,message,query,country,regionName,city,timezone,isp,org');
+                // Using ip-api.com for detailed IP information
+                const response = await fetch('http://ip-api.com/json/');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    ipAddressSpan.textContent = data.query || 'N/A';
-                    countrySpan.textContent = data.country || 'N/A';
-                    regionSpan.textContent = data.regionName || 'N/A';
-                    citySpan.textContent = data.city || 'N/A';
-                    timezoneSpan.textContent = data.timezone || 'N/A';
-                    ispSpan.textContent = data.isp || 'N/A';
-                    orgSpan.textContent = data.org || 'N/A';
-                    ipInfoDiv.style.display = 'block';
+                    ipInfoDiv.innerHTML = `
+                        <p><strong>IP Address:</strong> ${data.query}</p>
+                        <p><strong>Country:</strong> ${data.country} (${data.countryCode})</p>
+                        <p><strong>Region:</strong> ${data.regionName} (${data.region})</p>
+                        <p><strong>City:</strong> ${data.city}</p>
+                        <p><strong>Zip Code:</strong> ${data.zip}</p>
+                        <p><strong>Timezone:</strong> ${data.timezone}</p>
+                        <p><strong>ISP:</strong> ${data.isp}</p>
+                        <p><strong>Organization:</strong> ${data.org}</p>
+                        <p><strong>AS:</strong> ${data.as}</p>
+                    `;
                 } else {
-                    errorMessage.textContent = `Error: ${data.message || 'Could not fetch IP information.'}`;
-                    console.error('IP API Error:', data.message);
+                    ipInfoDiv.innerHTML = '<p>Failed to retrieve detailed IP information.</p>';
+                    errorMessage.textContent = `API Error: ${data.message || 'Unknown error'}`;
                 }
+
             } catch (error) {
-                errorMessage.textContent = `Failed to fetch IP information. Please check your internet connection.`;
-                console.error('Network or API fetch error:', error);
-            } finally {
-                loadingMessage.style.display = 'none';
-                refreshIpButton.disabled = false;
+                console.error('Error fetching IP information:', error);
+                ipInfoDiv.innerHTML = '<p>Could not retrieve IP information.</p>';
+                errorMessage.textContent = `Error: ${error.message}. Please check your internet connection or try again later.`;
             }
         }
 
-        // Fetch IP info when the page loads
-        document.addEventListener('DOMContentLoaded', fetchIpInfo);
-
-        // Refresh button functionality
-        refreshIpButton.addEventListener('click', fetchIpInfo);
+        // Call the function to get IP info when the page loads
+        document.addEventListener('DOMContentLoaded', getIpInfo);
     </script>
 </body>
 </html>
