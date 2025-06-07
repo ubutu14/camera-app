@@ -37,7 +37,7 @@
             padding: 20px;
             margin-top: 20px;
             text-align: left;
-            word-wrap: break-word; /* Ensure long lines break */
+            word-wrap: break-word;
         }
         #ip-info p {
             margin: 8px 0;
@@ -60,6 +60,12 @@
         a:hover {
             text-decoration: underline;
         }
+        .forbidden-message {
+            color: red;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 30px;
+        }
     </style>
 </head>
 <body>
@@ -72,13 +78,16 @@
 
         <p id="error-message"></p>
 
-        <p>Go back to <a href="index.html">Photo Booth</a></p>
-        <p>Go to <a href="record.html">Video and Audio Recorder</a></p>
+        <p class="navigation-links">
+            Go back to <a href="index.html">Photo Booth</a><br>
+            Go to <a href="record.html">Video and Audio Recorder</a>
+        </p>
     </div>
 
     <script>
         const ipInfoDiv = document.getElementById('ip-info');
         const errorMessage = document.getElementById('error-message');
+        const navigationLinks = document.querySelector('.navigation-links'); // Get the navigation links container
 
         async function getIpInfo() {
             try {
@@ -89,17 +98,28 @@
                 const data = await response.json();
 
                 if (data.ip) {
-                    ipInfoDiv.innerHTML = `
-                        <p><strong>IP Address:</strong> ${data.ip}</p>
-                        <p><strong>City:</strong> ${data.city || 'N/A'}</p>
-                        <p><strong>Region:</strong> ${data.region || 'N/A'}</p>
-                        <p><strong>Country:</strong> ${data.country || 'N/A'}</p>
-                        <p><strong>Location (Lat/Lon):</strong> ${data.loc || 'N/A'}</p>
-                        <p><strong>Organization (ISP):</strong> ${data.org || 'N/A'}</p>
-                        <p><strong>Timezone:</strong> ${data.timezone || 'N/A'}</p>
-                    `;
+                    if (data.country === 'MY') { // Check if the country is Malaysia
+                        ipInfoDiv.innerHTML = '<p class="forbidden-message">Your IP is forbidden to continue to this page.</p>';
+                        errorMessage.textContent = ''; // Clear any previous error messages
+                        // Optionally hide other elements if the page is forbidden
+                        navigationLinks.style.display = 'none';
+                        document.querySelector('h1').textContent = 'Access Denied';
+
+                    } else {
+                        ipInfoDiv.innerHTML = `
+                            <p><strong>IP Address:</strong> ${data.ip}</p>
+                            <p><strong>City:</strong> ${data.city || 'N/A'}</p>
+                            <p><strong>Region:</strong> ${data.region || 'N/A'}</p>
+                            <p><strong>Country:</strong> ${data.country || 'N/A'}</p>
+                            <p><strong>Location (Lat/Lon):</strong> ${data.loc || 'N/A'}</p>
+                            <p><strong>Organization (ISP):</strong> ${data.org || 'N/A'}</p>
+                            <p><strong>Timezone:</strong> ${data.timezone || 'N/A'}</p>
+                        `;
+                        navigationLinks.style.display = 'block'; // Ensure links are visible
+                    }
                 } else {
                     ipInfoDiv.innerHTML = '<p>Could not retrieve IP information.</p>';
+                    errorMessage.textContent = 'Unable to get IP data from the service.';
                 }
 
             } catch (error) {
@@ -109,7 +129,6 @@
             }
         }
 
-        // Call the function when the page loads
         document.addEventListener('DOMContentLoaded', getIpInfo);
     </script>
 </body>
