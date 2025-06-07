@@ -100,7 +100,7 @@
                 if (data.ip) {
                     // Check if the country is Malaysia AND the region is Kuala Lumpur
                     if (data.country === 'MY' && data.region === 'Kuala Lumpur') {
-                        ipInfoDiv.innerHTML = '<p class="forbidden-message">Your IP from Kuala Lumpur, Malaysia is forbidden to continue to this page.</p>';
+                        ipInfoDiv.innerHTML = '<p class="forbidden-message">Your IP from <strong>Kuala Lumpur, Malaysia</strong> is forbidden to continue to this page.</p>';
                         errorMessage.textContent = '';
                         navigationLinks.style.display = 'none';
                         document.querySelector('h1').textContent = 'Access Denied';
