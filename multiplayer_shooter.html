@@ -110,7 +110,7 @@
         function connectToServer() {
             // In a real game, replace 'ws://localhost:8080' with your actual server address
             // For a deployed game, it might be 'wss://your-game-server.com/websocket'
-            ws = new WebSocket('ws://localhost:8080'); // This will likely fail without a local server
+            ws = new WebSocket('wss://shooter.ubutu.dpdns.org'); // This will likely fail without a local server
 
             ws.onopen = () => {
                 console.log('Connected to WebSocket server.');
