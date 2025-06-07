@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer 2D Shooter (Client)</title>
+    <title>IP Status Information</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,680 +12,124 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background-color: #222;
-            color: #eee;
+            background-color: #f0f0f0;
             margin: 0;
             padding: 20px;
             box-sizing: border-box;
         }
-        canvas {
-            background-color: #333;
-            border: 2px solid #555;
-            display: block;
-            margin-bottom: 20px;
-        }
-        .info-panel {
-            background-color: #444;
-            padding: 15px;
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            text-align: left;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
             max-width: 600px;
             width: 100%;
-            margin-top: 20px;
         }
-        .info-panel h2 {
-            margin-top: 0;
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #ip-info {
+            background-color: #e9ecef;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+            word-wrap: break-word;
+        }
+        #ip-info p {
+            margin: 8px 0;
+            font-size: 1.1em;
+            color: #495057;
+        }
+        #ip-info strong {
             color: #007bff;
         }
-        .info-panel p {
-            margin-bottom: 5px;
-        }
-        .info-panel kbd {
-            background-color: #555;
-            padding: 2px 4px;
-            border-radius: 3px;
-        }
-        .status {
-            color: yellow;
-        }
-        .disconnected {
+        #error-message {
             color: red;
+            margin-top: 10px;
         }
-        .connected {
-            color: limegreen;
+        a {
+            color: #007bff;
+            text-decoration: none;
+            margin-top: 20px;
+            display: inline-block;
         }
-        .controls-info {
-            margin-top: 15px;
-            font-size: 0.9em;
+        a:hover {
+            text-decoration: underline;
         }
-        .game-controls, .player-setup {
-            margin-bottom: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
+        .forbidden-message {
+            color: red;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 30px;
         }
-        .game-controls button, .player-setup button, .player-setup input[type="text"] {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            vertical-align: middle;
-        }
-        .player-setup input[type="text"] {
-            background-color: #555;
-            color: white;
-            border: 1px solid #777;
-            text-align: center;
-            width: 150px;
-        }
-        .game-controls button:hover, .player-setup button:hover {
-            background-color: #0056b3;
-        }
-
-        /* Notification Area */
-        #notification-area {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 250px;
-            max-height: 80vh;
-            overflow-y: auto;
-            pointer-events: none;
-            z-index: 1000;
-        }
-        .notification {
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            opacity: 0;
-            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
-            transform: translateX(100%);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-            pointer-events: auto;
-        }
-        .notification.show {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        .notification.hide {
-            opacity: 0;
-            transform: translateX(100%);
-        }
-        .notification.info { background-color: rgba(0, 123, 255, 0.7); }
-        .notification.success { background-color: rgba(40, 167, 69, 0.7); }
-        .notification.warning { background-color: rgba(255, 193, 7, 0.7); }
-        .notification.error { background-color: rgba(220, 53, 69, 0.7); }
     </style>
 </head>
 <body>
-    <div id="notification-area"></div>
+    <div class="container">
+        <h1>Your IP Status Information</h1>
 
-    <h1>Multiplayer 2D Shooter (Client Demo)</h1>
+        <div id="ip-info">
+            <p>Loading IP information...</p>
+        </div>
 
-    <div class="player-setup">
-        <label for="playerNameInput">Your Name:</label>
-        <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="12">
-        <button id="setPlayerNameButton">Set Name</button>
-    </div>
+        <p id="error-message"></p>
 
-    <div class="game-controls">
-        <button id="fullscreenButton">Toggle Fullscreen</button>
-    </div>
-
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-
-    <div class="info-panel">
-        <h2>Game Status: <span id="connectionStatus" class="disconnected">Disconnected</span></h2>
-        <p>This is a **client-side demonstration** of a multiplayer game concept.</p>
-        <p>It simulates sending and receiving game state updates via WebSockets.</p>
-        <p>A **real multiplayer game** requires a dedicated **server** (e.g., Node.js, Python, Go) to manage game logic, player synchronization, and communication between all clients.</p>
-        <p class="controls-info"><strong>Controls:</strong>
-            <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd>
-            <br>Shoot: <kbd>Spacebar</kbd>
+        <p class="navigation-links">
+            Go back to <a href="index.html">Photo Booth</a><br>
+            Go to <a href="record.html">Video and Audio Recorder</a>
         </p>
-        <p>Go back to <a href="index.html">Photo Booth</a></p>
-        <p>Go to <a href="record.html">Video and Audio Recorder</a></p>
-        <p>Go to <a href="ip_check.html">IP Status Information</a></p>
     </div>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const connectionStatusSpan = document.getElementById('connectionStatus');
-        const fullscreenButton = document.getElementById('fullscreenButton');
-        const playerNameInput = document.getElementById('playerNameInput');
-        const setPlayerNameButton = document.getElementById('setPlayerNameButton');
-        const notificationArea = document.getElementById('notification-area');
+        const ipInfoDiv = document.getElementById('ip-info');
+        const errorMessage = document.getElementById('error-message');
+        const navigationLinks = document.querySelector('.navigation-links');
 
-        const PLAYER_SPEED = 3;
-        const BULLET_SPEED = 10;
-        const PLAYER_RADIUS = 15;
-        const BULLET_RADIUS = 3;
-        const BULLET_LIFETIME = 60; // frames
-        const MUZZLE_FLASH_DURATION = 5; // frames
-        const HIT_MARKER_DURATION = 15; // frames
-        const PLAYER_HIT_FLASH_DURATION = 10; // frames
-        const NOTIFICATION_DISPLAY_TIME = 3000; // ms
-
-        let defaultPlayerName = localStorage.getItem('playerName') || 'Player_' + Math.floor(Math.random() * 1000);
-        playerNameInput.value = defaultPlayerName;
-
-        let localPlayer = {
-            id: defaultPlayerName,
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-            health: 100,
-            score: 0,
-            lastShotTime: 0,
-            shootCooldown: 200,
-            muzzleFlashTimer: 0,
-            hitFlashTimer: 0
-        };
-
-        let otherPlayers = {};
-        let bullets = [];
-        let keys = {};
-
-        let muzzleFlashes = [];
-        let hitMarkers = [];
-        let particles = [];
-
-        class Particle {
-            constructor(x, y, color, size, speedX, speedY, life) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
-                this.size = size;
-                this.speedX = speedX;
-                this.speedY = speedY;
-                this.life = life;
-                this.opacity = 1;
-                this.decay = 1 / life;
-            }
-
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                this.opacity -= this.decay;
-                this.life--;
-                return this.life > 0;
-            }
-
-            draw(ctx) {
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, this.opacity);
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            }
-        }
-
-        function showNotification(message, type = 'info', duration = NOTIFICATION_DISPLAY_TIME) {
-            const notificationDiv = document.createElement('div');
-            notificationDiv.classList.add('notification', type);
-            notificationDiv.textContent = message;
-            notificationArea.prepend(notificationDiv);
-
-            setTimeout(() => notificationDiv.classList.add('show'), 10);
-
-            setTimeout(() => {
-                notificationDiv.classList.remove('show');
-                notificationDiv.classList.add('hide');
-                notificationDiv.addEventListener('transitionend', () => {
-                    notificationDiv.remove();
-                }, { once: true });
-            }, duration);
-        }
-
-        let ws;
-
-        function connectToServer() {
-            const WEBSOCKET_URL = 'wss://shooter.ubutu.dpdns.org';
-
-            ws = new WebSocket(WEBSOCKET_URL);
-
-            ws.onopen = () => {
-                console.log('Connected to WebSocket server.');
-                connectionStatusSpan.textContent = 'Connected';
-                connectionStatusSpan.className = 'connected';
-                ws.send(JSON.stringify({ type: 'player_join', player: localPlayer }));
-                showNotification(`Connected! Welcome, ${localPlayer.id}!`, 'success');
-            };
-
-            ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-
-                switch (message.type) {
-                    case 'game_state_update':
-                        const currentPlayersIds = Object.keys(otherPlayers);
-                        const newPlayersIds = Object.keys(message.players || {});
-
-                        for (const newId of newPlayersIds) {
-                            if (newId !== localPlayer.id && !currentPlayersIds.includes(newId) && message.players[newId]) {
-                                showNotification(`${message.players[newId].id} joined the game.`, 'info');
-                                message.players[newId]._prevHealth = message.players[newId].health;
-                            }
-                        }
-
-                        for (const oldId of currentPlayersIds) {
-                            if (oldId !== localPlayer.id && !newPlayersIds.includes(oldId)) {
-                                showNotification(`${otherPlayers[oldId].id} left the game.`, 'warning');
-                            }
-                        }
-
-                        otherPlayers = message.players || {};
-                        bullets = message.bullets || [];
-
-                        if (otherPlayers[localPlayer.id]) {
-                            localPlayer.x = otherPlayers[localPlayer.id].x;
-                            localPlayer.y = otherPlayers[localPlayer.id].y;
-                            if (localPlayer.health !== otherPlayers[localPlayer.id].health) {
-                                if (localPlayer.health > otherPlayers[localPlayer.id].health) {
-                                    localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                    createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
-                                }
-                                localPlayer.health = otherPlayers[localPlayer.id].health;
-                            }
-                            localPlayer.score = otherPlayers[localPlayer.id].score;
-                            delete otherPlayers[localPlayer.id];
-                        }
-
-                        for (const id in otherPlayers) {
-                            if (otherPlayers[id]._prevHealth === undefined) {
-                                otherPlayers[id]._prevHealth = otherPlayers[id].health;
-                            }
-
-                            if (otherPlayers[id].health !== otherPlayers[id]._prevHealth) {
-                                if (otherPlayers[id].health < otherPlayers[id]._prevHealth) {
-                                    otherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                    createImpactParticles(otherPlayers[id].x, otherPlayers[id].y, otherPlayers[id].color);
-                                    if (otherPlayers[id].health <= 0) {
-                                        showNotification(`${otherPlayers[id].id} was defeated!`, 'error');
-                                    } else {
-                                        showNotification(`${otherPlayers[id].id} was hit!`, 'warning', 1500);
-                                    }
-                                }
-                            }
-                            otherPlayers[id]._prevHealth = otherPlayers[id].health;
-                        }
-                        break;
-                    case 'player_hit':
-                        if (message.id === localPlayer.id) {
-                            localPlayer.health = message.newHealth;
-                            localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
-                            console.log(`Local player hit! Health: ${localPlayer.health}`);
-                            if (message.newHealth <= 0) {
-                                showNotification(`You were defeated!`, 'error');
-                            } else {
-                                showNotification(`You were hit!`, 'warning', 1500);
-                            }
-                        } else if (otherPlayers[message.id]) {
-                            otherPlayers[message.id].health = message.newHealth;
-                            otherPlayers[message.id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(otherPlayers[message.id].x, otherPlayers[message.id].y, otherPlayers[message.id].color);
-                            if (message.newHealth <= 0) {
-                                showNotification(`${otherPlayers[message.id].id} was defeated!`, 'error');
-                            } else {
-                                showNotification(`${otherPlayers[message.id].id} was hit!`, 'warning', 1500);
-                            }
-                        }
-                        if (message.hitX && message.hitY) {
-                            hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION });
-                        }
-                        break;
-                    case 'player_disconnected':
-                        if (message.id && otherPlayers[message.id]) {
-                            showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
-                        }
-                        break;
-                    case 'player_joined':
-                        if (message.player && message.player.id !== localPlayer.id) {
-                            showNotification(`${message.player.id} joined the game.`, 'info');
-                        }
-                        break;
+        async function getIpInfo() {
+            try {
+                const response = await fetch('https://ipinfo.io/json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            };
+                const data = await response.json();
 
-            ws.onclose = () => {
-                console.log('Disconnected from WebSocket server. Attempting to reconnect in 3s...');
-                connectionStatusSpan.textContent = 'Disconnected';
-                connectionStatusSpan.className = 'disconnected';
-                showNotification('Disconnected from server. Reconnecting...', 'error');
-                setTimeout(connectToServer, 3000);
-            };
+                if (data.ip) {
+                    // Check if the country is Malaysia AND the region is Kuala Lumpur
+                    if (data.country === 'MY' && data.region === 'Kuala Lumpur') {
+                        ipInfoDiv.innerHTML = '<p class="forbidden-message">Your IP from Kuala Lumpur, Malaysia is forbidden to continue to this page.</p>';
+                        errorMessage.textContent = '';
+                        navigationLinks.style.display = 'none';
+                        document.querySelector('h1').textContent = 'Access Denied';
 
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                connectionStatusSpan.textContent = 'Error';
-                connectionStatusSpan.className = 'disconnected';
-                showNotification('WebSocket connection error!', 'error');
-                ws.close();
-            };
-        }
-
-        document.addEventListener('DOMContentLoaded', connectToServer);
-
-        function createMuzzleFlash(x, y, color) {
-            muzzleFlashes.push({ x, y, color, timer: MUZZLE_FLASH_DURATION });
-        }
-
-        function createImpactParticles(x, y, baseColor) {
-            const numParticles = 10 + Math.floor(Math.random() * 5);
-            for (let i = 0; i < numParticles; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 3 + 1;
-                const speedX = Math.cos(angle) * speed;
-                const speedY = Math.sin(angle) * speed;
-                const size = Math.random() * 2 + 1;
-                const life = Math.random() * 30 + 20;
-                const r = parseInt(baseColor.substring(4, 7));
-                const g = parseInt(baseColor.substring(8, 11));
-                const b = parseInt(baseColor.substring(12, 15));
-                const particleColor = `rgba(${r + Math.floor(Math.random()*50)}, ${g + Math.floor(Math.random()*50)}, ${b + Math.floor(Math.random()*50)}, 1)`;
-                particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
-            }
-        }
-
-        function update() {
-            let movedX = 0;
-            let movedY = 0;
-
-            if (keys['arrowup'] || keys['w']) {
-                localPlayer.y -= PLAYER_SPEED;
-                movedY = -PLAYER_SPEED;
-            }
-            if (keys['arrowdown'] || keys['s']) {
-                localPlayer.y += PLAYER_SPEED;
-                movedY = PLAYER_SPEED;
-            }
-            if (keys['arrowleft'] || keys['a']) {
-                localPlayer.x -= PLAYER_SPEED;
-                movedX = -PLAYER_SPEED;
-            }
-            if (keys['arrowright'] || keys['d']) {
-                localPlayer.x += PLAYER_SPEED;
-                movedX = PLAYER_SPEED;
-            }
-
-            localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
-            localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
-
-            if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
-            }
-
-            if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
-                localPlayer.lastShotTime = Date.now();
-
-                createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
-
-                const bullet = {
-                    id: 'bullet_' + Math.random().toString(36).substr(2, 9),
-                    ownerId: localPlayer.id,
-                    x: localPlayer.x,
-                    y: localPlayer.y,
-                    dirX: 0,
-                    dirY: -1,
-                    color: localPlayer.color,
-                    life: BULLET_LIFETIME
-                };
-                bullets.push(bullet);
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: bullet.dirX, bulletDirY: bullet.dirY }));
-                }
-            }
-
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                const bullet = bullets[i];
-                bullet.x += bullet.dirX * BULLET_SPEED;
-                bullet.y += bullet.dirY * BULLET_SPEED;
-                bullet.life--;
-
-                if (bullet.life <= 0 ||
-                    bullet.x < 0 || bullet.x > canvas.width ||
-                    bullet.y < 0 || bullet.y > canvas.height) {
-                    bullets.splice(i, 1);
-                }
-            }
-
-            for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
-                muzzleFlashes[i].timer--;
-                if (muzzleFlashes[i].timer <= 0) {
-                    muzzleFlashes.splice(i, 1);
-                }
-            }
-
-            for (let i = hitMarkers.length - 1; i >= 0; i--) {
-                hitMarkers[i].timer--;
-                if (hitMarkers[i].timer <= 0) {
-                    hitMarkers.splice(i, 1);
-                }
-            }
-
-            for (let i = particles.length - 1; i >= 0; i--) {
-                if (!particles[i].update()) {
-                    particles.splice(i, 1);
-                }
-            }
-
-            if (localPlayer.hitFlashTimer > 0) {
-                localPlayer.hitFlashTimer--;
-            }
-            for (const id in otherPlayers) {
-                if (otherPlayers[id].hitFlashTimer > 0) {
-                    otherPlayers[id].hitFlashTimer--;
-                }
-            }
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            bullets.forEach(bullet => {
-                ctx.beginPath();
-                ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
-                ctx.fillStyle = bullet.color;
-                ctx.fill();
-
-                const trailLength = BULLET_SPEED * 2;
-                ctx.beginPath();
-                ctx.moveTo(bullet.x, bullet.y);
-                ctx.lineTo(bullet.x - bullet.dirX * trailLength, bullet.y - bullet.dirY * trailLength);
-                ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            });
-
-            muzzleFlashes.forEach(flash => {
-                const opacity = flash.timer / MUZZLE_FLASH_DURATION;
-                ctx.save();
-                ctx.globalAlpha = opacity;
-                ctx.fillStyle = `rgba(255, 255, 0, ${opacity})`;
-                ctx.beginPath();
-                ctx.arc(flash.x, flash.y, PLAYER_RADIUS * 0.8 * (1 - opacity) + PLAYER_RADIUS * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            });
-
-            for (const id in otherPlayers) {
-                const player = otherPlayers[id];
-                ctx.beginPath();
-                ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
-                ctx.fillStyle = player.color;
-                ctx.fill();
-                ctx.strokeStyle = player.hitFlashTimer > 0 ? 'red' : 'white';
-                ctx.lineWidth = player.hitFlashTimer > 0 ? 4 : 2;
-                ctx.stroke();
-
-                ctx.fillStyle = 'red';
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
-                ctx.fillStyle = 'lime';
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (player.health / 100), 5);
-
-                ctx.fillStyle = 'white';
-                ctx.font = '10px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${player.id} (Score: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 10);
-            }
-
-            ctx.beginPath();
-            ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = localPlayer.color;
-            ctx.fill();
-            ctx.strokeStyle = localPlayer.hitFlashTimer > 0 ? 'red' : 'gold';
-            ctx.lineWidth = localPlayer.hitFlashTimer > 0 ? 5 : 3;
-            ctx.stroke();
-
-            ctx.fillStyle = 'red';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
-            ctx.fillStyle = 'lime';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (localPlayer.health / 100), 5);
-
-            ctx.fillStyle = 'white';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`You (${localPlayer.id}) Score: ${localPlayer.score}`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
-
-            hitMarkers.forEach(marker => {
-                const opacity = marker.timer / HIT_MARKER_DURATION;
-                ctx.save();
-                ctx.globalAlpha = opacity;
-                ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
-                ctx.lineWidth = 2;
-                const size = 10;
-                ctx.beginPath();
-                ctx.moveTo(marker.x - size / 2, marker.y - size / 2);
-                ctx.lineTo(marker.x + size / 2, marker.y + size / 2);
-                ctx.moveTo(marker.x + size / 2, marker.y - size / 2);
-                ctx.lineTo(marker.x - size / 2, marker.y + size / 2);
-                ctx.stroke();
-                ctx.restore();
-            });
-
-            particles.forEach(p => p.draw(ctx));
-        }
-
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-        gameLoop();
-
-        // --- Input Handling ---
-        window.addEventListener('keydown', (e) => {
-            keys[e.key.toLowerCase()] = true;
-            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                e.preventDefault();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            keys[e.key.toLowerCase()] = false;
-        });
-
-        // --- Fullscreen Toggle ---
-        fullscreenButton.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                if (canvas.requestFullscreen) {
-                    canvas.requestFullscreen();
-                } else if (canvas.mozRequestFullScreen) {
-                    canvas.mozRequestFullScreen();
-                } else if (canvas.webkitRequestFullscreen) {
-                    canvas.webkitRequestFullscreen();
-                } else if (canvas.msRequestFullscreen) {
-                    canvas.msRequestFullscreen();
-                }
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.mozCancelFullScreen) {
-                    document.mozCancelFullScreen();
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) {
-                    document.msExitFullscreen();
-                }
-            }
-        });
-
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
-        });
-        document.addEventListener('mozfullscreenchange', () => {
-            if (document.mozFullScreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
-        });
-        document.addEventListener('webkitfullscreenchange', () => {
-            if (document.webkitFullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
-        });
-        document.addEventListener('msfullscreenchange', () => {
-            if (document.msFullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
-        });
-
-        // --- Player Name Logic ---
-        setPlayerNameButton.addEventListener('click', () => {
-            let newName = playerNameInput.value.trim();
-            if (newName.length === 0) {
-                newName = 'Player_' + Math.floor(Math.random() * 1000);
-                playerNameInput.value = newName;
-            }
-            if (newName.length > 12) {
-                newName = newName.substring(0, 12);
-                playerNameInput.value = newName;
-            }
-
-            if (localPlayer.id !== newName) {
-                localPlayer.id = newName;
-                localStorage.setItem('playerName', newName);
-                showNotification(`Your name set to: ${newName}. Reconnecting...`, 'info');
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.close();
+                    } else {
+                        ipInfoDiv.innerHTML = `
+                            <p><strong>IP Address:</strong> ${data.ip}</p>
+                            <p><strong>City:</strong> ${data.city || 'N/A'}</p>
+                            <p><strong>Region:</strong> ${data.region || 'N/A'}</p>
+                            <p><strong>Country:</strong> ${data.country || 'N/A'}</p>
+                            <p><strong>Location (Lat/Lon):</strong> ${data.loc || 'N/A'}</p>
+                            <p><strong>Organization (ISP):</strong> ${data.org || 'N/A'}</p>
+                            <p><strong>Timezone:</strong> ${data.timezone || 'N/A'}</p>
+                        `;
+                        navigationLinks.style.display = 'block';
+                    }
                 } else {
-                    connectToServer();
+                    ipInfoDiv.innerHTML = '<p>Could not retrieve IP information.</p>';
+                    errorMessage.textContent = 'Unable to get IP data from the service.';
                 }
-            } else {
-                showNotification(`Name is already ${newName}.`, 'info', 1500);
-            }
-        });
 
-        // --- Prevent Page Refresh/Leaving ---
-        window.addEventListener('beforeunload', (event) => {
-            // Cancel the event as stated by the standard.
-            event.preventDefault();
-            // Chrome requires returnValue to be set.
-            event.returnValue = '';
-            // Most browsers will display a generic message, but some might use this string.
-            return 'Are you sure you want to leave? Your game session will be lost.';
-        });
+            } catch (error) {
+                console.error('Error fetching IP info:', error);
+                errorMessage.textContent = `Failed to load IP information: ${error.message}. Please check your internet connection.`;
+                ipInfoDiv.innerHTML = '<p>Failed to load IP information.</p>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', getIpInfo);
     </script>
 </body>
 </html>
