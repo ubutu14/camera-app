@@ -131,32 +131,16 @@
         .notification.warning { background-color: rgba(255, 193, 7, 0.7); }
         .notification.error { background-color: rgba(220, 53, 69, 0.7); }
 
-        /* Mobile Controls Container - IMPORTANT CHANGES HERE */
+        /* Mobile Controls */
         .mobile-controls-container {
-            position: fixed; /* Make it fixed relative to the viewport */
-            bottom: 20px; /* Position it from the bottom */
-            left: 0;
-            right: 0;
-            width: 100%; /* Take full width of the viewport */
-            max-width: 800px; /* Still constrain max width for larger screens */
-            margin: 0 auto; /* Center it horizontally */
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            padding: 10px 20px; /* Add some horizontal padding */
-            box-sizing: border-box; /* Include padding in width */
-            z-index: 10; /* Ensure it's above the canvas and other game elements */
-            transition: opacity 0.3s ease-in-out; /* Smooth opacity change */
-            /* Initially, pointer-events: none on the container, but auto on buttons,
-               so clicks only register on the actual buttons, not the space between them. */
-            pointer-events: none;
+            width: 100%;
+            max-width: 800px; /* Match canvas width */
+            margin-top: 20px;
+            padding: 10px 0;
         }
-
-        /* New: Semi-transparent style for fullscreen */
-        .mobile-controls-container.fullscreen-transparent {
-            opacity: 0.5; /* Adjust this value (0.0 to 1.0) for desired transparency */
-        }
-
 
         .d-pad {
             display: grid;
@@ -182,7 +166,6 @@
             cursor: pointer;
             transition: background-color 0.1s ease;
             -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on tap */
-            pointer-events: auto; /* Allow interaction on buttons */
         }
         .d-pad button:active {
             background-color: #0056b3;
@@ -220,7 +203,6 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             transition: background-color 0.1s ease, transform 0.1s ease;
             -webkit-tap-highlight-color: transparent;
-            pointer-events: auto; /* Allow interaction on buttons */
         }
         .action-buttons button:active {
             background-color: #218838;
@@ -231,10 +213,6 @@
         }
 
         /* Optional: Hide mobile controls on larger screens if you only want keyboard for desktop */
-        /* If you uncomment this, make sure to add JS to make mobileControlsContainer.style.display = 'flex';
-           when entering fullscreen if you want them to appear only then.
-           For now, they are always visible but positioned to the bottom.
-        */
         /* @media (min-width: 768px) {
             .mobile-controls-container {
                 display: none;
@@ -260,7 +238,7 @@
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
     <!-- Mobile Controls -->
-    <div class="mobile-controls-container" id="mobileControlsContainer">
+    <div class="mobile-controls-container">
         <div class="d-pad">
             <button id="moveUp" class="up">↑</button>
             <button id="moveLeft" class="left">←</button>
@@ -296,8 +274,7 @@
         const setPlayerNameButton = document.getElementById('setPlayerNameButton');
         const notificationArea = document.getElementById('notification-area');
 
-        // Mobile control elements
-        const mobileControlsContainer = document.getElementById('mobileControlsContainer'); // Get the container
+        // Mobile control buttons (New)
         const moveUpButton = document.getElementById('moveUp');
         const moveDownButton = document.getElementById('moveDown');
         const moveLeftButton = document.getElementById('moveLeft');
@@ -426,6 +403,8 @@
                         otherPlayers = message.players || {};
                         bullets = message.bullets || [];
 
+                        // IMPORTANT: For localPlayer, update its position directly from server
+                        // This is the "server authoritative" update that corrects client-side prediction
                         if (otherPlayers[localPlayer.id]) {
                             localPlayer.x = otherPlayers[localPlayer.id].x;
                             localPlayer.y = otherPlayers[localPlayer.id].y;
@@ -437,9 +416,10 @@
                                 localPlayer.health = otherPlayers[localPlayer.id].health;
                             }
                             localPlayer.score = otherPlayers[localPlayer.id].score;
-                            delete otherPlayers[localPlayer.id];
+                            delete otherPlayers[localPlayer.id]; // Remove local player from otherPlayers list
                         }
 
+                        // For other players, update their health and flash timer
                         for (const id in otherPlayers) {
                             if (otherPlayers[id]._prevHealth === undefined) {
                                 otherPlayers[id]._prevHealth = otherPlayers[id].health;
@@ -542,22 +522,22 @@
             let movedX = 0;
             let movedY = 0;
 
-            // Client-side prediction logic
+            // This is the client-side prediction logic
             if (keys['arrowup'] || keys['w']) {
                 localPlayer.y -= PLAYER_SPEED;
-                movedY = -PLAYER_SPEED;
+                movedY = -PLAYER_SPEED; // Indicate movement for sending to server
             }
             if (keys['arrowdown'] || keys['s']) {
                 localPlayer.y += PLAYER_SPEED;
-                movedY = PLAYER_SPEED;
+                movedY = PLAYER_SPEED; // Indicate movement for sending to server
             }
             if (keys['arrowleft'] || keys['a']) {
                 localPlayer.x -= PLAYER_SPEED;
-                movedX = -PLAYER_SPEED;
+                movedX = -PLAYER_SPEED; // Indicate movement for sending to server
             }
             if (keys['arrowright'] || keys['d']) {
                 localPlayer.x += PLAYER_SPEED;
-                movedX = PLAYER_SPEED;
+                movedX = PLAYER_SPEED; // Indicate movement for sending to server
             }
 
             // Clamp local player position to canvas bounds
@@ -565,7 +545,8 @@
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
             // Send movement to server if character moved
-            // This sends absolute position (x,y)
+            // Note: This sends absolute position (x,y) if server is set up to receive 'player_move'
+            // If your server expects 'player_input' with dx, dy, this will need to change.
             if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
                 ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
             }
@@ -577,10 +558,11 @@
 
                 // Send shoot action to server
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 }));
+                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 })); // Always shoot up for now
                 }
             }
 
+            // Update bullets (client-side prediction)
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.x += bullet.dirX * BULLET_SPEED;
@@ -594,6 +576,7 @@
                 }
             }
 
+            // Update visual effects
             for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
                 muzzleFlashes[i].timer--;
                 if (muzzleFlashes[i].timer <= 0) {
@@ -730,29 +713,34 @@
             keys[e.key.toLowerCase()] = false;
         });
 
-        // --- Mobile/Touch Controls Input Handling ---
+        // --- Mobile/Touch Controls Input Handling (New) ---
         function addTouchAndMouseListeners(element, keyName) {
             const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
             const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
-            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave';
+            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave'; // For when finger slides off or mouse leaves
 
             element.addEventListener(startEvent, (e) => {
-                e.preventDefault();
+                e.preventDefault(); // Prevent scrolling/default behavior
                 keys[keyName] = true;
-            }, { passive: false });
+                // console.log(`Button ${keyName} pressed`); // Debugging mobile input
+            }, { passive: false }); // passive: false to allow preventDefault
 
             element.addEventListener(endEvent, (e) => {
                 e.preventDefault();
                 keys[keyName] = false;
+                // console.log(`Button ${keyName} released`); // Debugging mobile input
             });
 
+            // Handle cases where touch/mouse leaves the button area before release
             element.addEventListener(leaveEvent, (e) => {
-                 if (keys[keyName]) {
+                 if (keys[keyName]) { // Only if it was previously pressed by this interaction
                     keys[keyName] = false;
+                    // console.log(`Button ${keyName} left area, released`);
                  }
             });
         }
 
+        // Attach listeners to mobile control buttons
         addTouchAndMouseListeners(moveUpButton, 'w');
         addTouchAndMouseListeners(moveDownButton, 's');
         addTouchAndMouseListeners(moveLeftButton, 'a');
@@ -760,7 +748,7 @@
         addTouchAndMouseListeners(shootButton, ' ');
 
 
-        // --- Fullscreen Toggle and Transparency Logic (Modified) ---
+        // --- Fullscreen Toggle ---
         fullscreenButton.addEventListener('click', () => {
             if (!document.fullscreenElement) {
                 if (canvas.requestFullscreen) {
@@ -785,26 +773,34 @@
             }
         });
 
-        // Universal fullscreen change listener
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('msfullscreenchange', handleFullscreenChange);
-
-        function handleFullscreenChange() {
-            if (document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
                 fullscreenButton.textContent = 'Exit Fullscreen';
-                // Add transparency class when entering fullscreen
-                mobileControlsContainer.classList.add('fullscreen-transparent');
-                console.log("Entering fullscreen, adding fullscreen-transparent class."); // Debugging
             } else {
                 fullscreenButton.textContent = 'Toggle Fullscreen';
-                // Remove transparency class when exiting fullscreen
-                mobileControlsContainer.classList.remove('fullscreen-transparent');
-                console.log("Exiting fullscreen, removing fullscreen-transparent class."); // Debugging
             }
-        }
-
+        });
+        document.addEventListener('mozfullscreenchange', () => {
+            if (document.mozFullScreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Toggle Fullscreen';
+            }
+        });
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (document.webkitFullscreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Toggle Fullscreen';
+            }
+        });
+        document.addEventListener('msfullscreenchange', () => {
+            if (document.msFullscreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Toggle Fullscreen';
+            }
+        });
 
         // --- Player Name Logic ---
         setPlayerNameButton.addEventListener('click', () => {
