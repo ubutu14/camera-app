@@ -96,7 +96,7 @@
             width: 250px;
             max-height: 80vh;
             overflow-y: auto;
-            pointer-events: none; /* Allows clicks to pass through */
+            pointer-events: none;
             z-index: 1000;
         }
         .notification {
@@ -105,11 +105,11 @@
             padding: 10px 15px;
             border-radius: 5px;
             margin-bottom: 10px;
-            opacity: 0; /* Start hidden */
+            opacity: 0;
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
-            transform: translateX(100%); /* Start off-screen */
+            transform: translateX(100%);
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-            pointer-events: auto; /* Make notification clickable if needed, though not for this demo */
+            pointer-events: auto;
         }
         .notification.show {
             opacity: 1;
@@ -119,10 +119,10 @@
             opacity: 0;
             transform: translateX(100%);
         }
-        .notification.info { background-color: rgba(0, 123, 255, 0.7); } /* Blue */
-        .notification.success { background-color: rgba(40, 167, 69, 0.7); } /* Green */
-        .notification.warning { background-color: rgba(255, 193, 7, 0.7); } /* Yellow */
-        .notification.error { background-color: rgba(220, 53, 69, 0.7); } /* Red */
+        .notification.info { background-color: rgba(0, 123, 255, 0.7); }
+        .notification.success { background-color: rgba(40, 167, 69, 0.7); }
+        .notification.warning { background-color: rgba(255, 193, 7, 0.7); }
+        .notification.error { background-color: rgba(220, 53, 69, 0.7); }
     </style>
 </head>
 <body>
@@ -161,9 +161,9 @@
         const ctx = canvas.getContext('2d');
         const connectionStatusSpan = document.getElementById('connectionStatus');
         const fullscreenButton = document.getElementById('fullscreenButton');
-        const playerNameInput = document.getElementById('playerNameInput'); // New
-        const setPlayerNameButton = document.getElementById('setPlayerNameButton'); // New
-        const notificationArea = document.getElementById('notification-area'); // New
+        const playerNameInput = document.getElementById('playerNameInput');
+        const setPlayerNameButton = document.getElementById('setPlayerNameButton');
+        const notificationArea = document.getElementById('notification-area');
 
         const PLAYER_SPEED = 3;
         const BULLET_SPEED = 10;
@@ -175,12 +175,11 @@
         const PLAYER_HIT_FLASH_DURATION = 10; // frames
         const NOTIFICATION_DISPLAY_TIME = 3000; // ms
 
-        // Initialize localPlayer ID with a default or from localStorage if available
         let defaultPlayerName = localStorage.getItem('playerName') || 'Player_' + Math.floor(Math.random() * 1000);
         playerNameInput.value = defaultPlayerName;
 
         let localPlayer = {
-            id: defaultPlayerName, // Will be updated by input
+            id: defaultPlayerName,
             x: canvas.width / 2,
             y: canvas.height / 2,
             color: `hsl(${Math.random() * 360}, 70%, 60%)`,
@@ -232,17 +231,14 @@
             }
         }
 
-        // --- Notification System ---
         function showNotification(message, type = 'info', duration = NOTIFICATION_DISPLAY_TIME) {
             const notificationDiv = document.createElement('div');
             notificationDiv.classList.add('notification', type);
             notificationDiv.textContent = message;
-            notificationArea.prepend(notificationDiv); // Add to top
+            notificationArea.prepend(notificationDiv);
 
-            // Trigger fade-in
             setTimeout(() => notificationDiv.classList.add('show'), 10);
 
-            // Trigger fade-out and removal
             setTimeout(() => {
                 notificationDiv.classList.remove('show');
                 notificationDiv.classList.add('hide');
@@ -263,7 +259,6 @@
                 console.log('Connected to WebSocket server.');
                 connectionStatusSpan.textContent = 'Connected';
                 connectionStatusSpan.className = 'connected';
-                // Send initial player data with the chosen name
                 ws.send(JSON.stringify({ type: 'player_join', player: localPlayer }));
                 showNotification(`Connected! Welcome, ${localPlayer.id}!`, 'success');
             };
@@ -273,20 +268,16 @@
 
                 switch (message.type) {
                     case 'game_state_update':
-                        // Detect new players joining or existing players disconnecting
                         const currentPlayersIds = Object.keys(otherPlayers);
                         const newPlayersIds = Object.keys(message.players || {});
 
-                        // Players who joined
                         for (const newId of newPlayersIds) {
                             if (newId !== localPlayer.id && !currentPlayersIds.includes(newId) && message.players[newId]) {
                                 showNotification(`${message.players[newId].id} joined the game.`, 'info');
-                                // Initialize _prevHealth for new players
                                 message.players[newId]._prevHealth = message.players[newId].health;
                             }
                         }
 
-                        // Players who left
                         for (const oldId of currentPlayersIds) {
                             if (oldId !== localPlayer.id && !newPlayersIds.includes(oldId)) {
                                 showNotification(`${otherPlayers[oldId].id} left the game.`, 'warning');
@@ -311,7 +302,6 @@
                         }
 
                         for (const id in otherPlayers) {
-                            // Track health changes for hit flash and defeat notifications
                             if (otherPlayers[id]._prevHealth === undefined) {
                                 otherPlayers[id]._prevHealth = otherPlayers[id].health;
                             }
@@ -323,14 +313,14 @@
                                     if (otherPlayers[id].health <= 0) {
                                         showNotification(`${otherPlayers[id].id} was defeated!`, 'error');
                                     } else {
-                                        showNotification(`${otherPlayers[id].id} was hit!`, 'warning', 1500); // Shorter duration for hits
+                                        showNotification(`${otherPlayers[id].id} was hit!`, 'warning', 1500);
                                     }
                                 }
                             }
                             otherPlayers[id]._prevHealth = otherPlayers[id].health;
                         }
                         break;
-                    case 'player_hit': // This message is assumed if server sends explicit hit events
+                    case 'player_hit':
                         if (message.id === localPlayer.id) {
                             localPlayer.health = message.newHealth;
                             localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
@@ -355,12 +345,12 @@
                             hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION });
                         }
                         break;
-                    case 'player_disconnected': // Server should send this
+                    case 'player_disconnected':
                         if (message.id && otherPlayers[message.id]) {
                             showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
                         }
                         break;
-                    case 'player_joined': // Server should send this
+                    case 'player_joined':
                         if (message.player && message.player.id !== localPlayer.id) {
                             showNotification(`${message.player.id} joined the game.`, 'info');
                         }
@@ -548,7 +538,6 @@
                 ctx.fillStyle = 'white';
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
-                // Display player name and score
                 ctx.fillText(`${player.id} (Score: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 10);
             }
 
@@ -568,7 +557,6 @@
             ctx.fillStyle = 'white';
             ctx.font = '12px Arial';
             ctx.textAlign = 'center';
-            // Display local player name and score
             ctx.fillText(`You (${localPlayer.id}) Score: ${localPlayer.score}`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
 
             hitMarkers.forEach(marker => {
@@ -667,27 +655,36 @@
         setPlayerNameButton.addEventListener('click', () => {
             let newName = playerNameInput.value.trim();
             if (newName.length === 0) {
-                newName = 'Player_' + Math.floor(Math.random() * 1000); // Fallback to random if empty
+                newName = 'Player_' + Math.floor(Math.random() * 1000);
                 playerNameInput.value = newName;
             }
-            if (newName.length > 12) { // Enforce max length if needed
+            if (newName.length > 12) {
                 newName = newName.substring(0, 12);
                 playerNameInput.value = newName;
             }
 
             if (localPlayer.id !== newName) {
                 localPlayer.id = newName;
-                localStorage.setItem('playerName', newName); // Save name for future visits
+                localStorage.setItem('playerName', newName);
                 showNotification(`Your name set to: ${newName}. Reconnecting...`, 'info');
-                // Reconnect WebSocket to send new player ID to server
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.close(); // This will trigger onclose and reconnect logic
+                    ws.close();
                 } else {
-                    connectToServer(); // Directly connect if not already
+                    connectToServer();
                 }
             } else {
                 showNotification(`Name is already ${newName}.`, 'info', 1500);
             }
+        });
+
+        // --- Prevent Page Refresh/Leaving ---
+        window.addEventListener('beforeunload', (event) => {
+            // Cancel the event as stated by the standard.
+            event.preventDefault();
+            // Chrome requires returnValue to be set.
+            event.returnValue = '';
+            // Most browsers will display a generic message, but some might use this string.
+            return 'Are you sure you want to leave? Your game session will be lost.';
         });
     </script>
 </body>
