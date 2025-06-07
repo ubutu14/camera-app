@@ -87,7 +87,7 @@
     <script>
         const ipInfoDiv = document.getElementById('ip-info');
         const errorMessage = document.getElementById('error-message');
-        const navigationLinks = document.querySelector('.navigation-links'); // Get the navigation links container
+        const navigationLinks = document.querySelector('.navigation-links');
 
         async function getIpInfo() {
             try {
@@ -98,10 +98,10 @@
                 const data = await response.json();
 
                 if (data.ip) {
-                    if (data.country === 'MY') { // Check if the country is Malaysia
-                        ipInfoDiv.innerHTML = '<p class="forbidden-message">Your IP is forbidden to continue to this page.</p>';
-                        errorMessage.textContent = ''; // Clear any previous error messages
-                        // Optionally hide other elements if the page is forbidden
+                    // Check if the country is Malaysia AND the region is Kuala Lumpur
+                    if (data.country === 'MY' && data.region === 'Kuala Lumpur') {
+                        ipInfoDiv.innerHTML = '<p class="forbidden-message">Your IP from Kuala Lumpur, Malaysia is forbidden to continue to this page.</p>';
+                        errorMessage.textContent = '';
                         navigationLinks.style.display = 'none';
                         document.querySelector('h1').textContent = 'Access Denied';
 
@@ -115,7 +115,7 @@
                             <p><strong>Organization (ISP):</strong> ${data.org || 'N/A'}</p>
                             <p><strong>Timezone:</strong> ${data.timezone || 'N/A'}</p>
                         `;
-                        navigationLinks.style.display = 'block'; // Ensure links are visible
+                        navigationLinks.style.display = 'block';
                     }
                 } else {
                     ipInfoDiv.innerHTML = '<p>Could not retrieve IP information.</p>';
