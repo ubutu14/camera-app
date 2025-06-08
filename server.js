@@ -1,5 +1,3 @@
-// server.js (The complete and correct version for your game)
-
 const WebSocket = require('ws');
 const http = require('http');
 
@@ -16,12 +14,13 @@ const bullets = {}; // Stores all active bullets' states
 
 // --- Game Settings (Server-side authoritative) ---
 const GAME_TICK_RATE = 1000 / 60; // 60 updates per second
-const PLAYER_SPEED = 3; // IMPORTANT: This must be consistent with client's PLAYER_SPEED
+const PLAYER_SPEED = 3; // Server's authoritative player speed
 const BULLET_SPEED = 10;
 const PLAYER_RADIUS = 15;
 const BULLET_RADIUS = 3;
 const BULLET_LIFETIME = 60; // frames (adjust if your client's bullet lifetime is different)
 const MAX_HEALTH = 100;
+const SHOOT_COOLDOWN = 200; // milliseconds
 
 let nextBulletId = 0; // Simple ID counter for bullets
 
@@ -51,7 +50,8 @@ wss.on('connection', ws => {
                         y: parsedMessage.player.y,
                         color: parsedMessage.player.color,
                         health: MAX_HEALTH, // Always start with full health on server
-                        score: 0
+                        score: 0,
+                        lastShotTime: 0 // Initialize last shot time for server-side cooldown
                     };
                     console.log(`Player ${playerId} joined.`);
                     // Send back the confirmed player ID to the client if it was adjusted
@@ -69,14 +69,13 @@ wss.on('connection', ws => {
                 case 'player_input':
                     if (playerId && players[playerId]) {
                         const player = players[playerId];
-                        const dx = parsedMessage.dx; // Direction X from client
-                        const dy = parsedMessage.dy; // Direction Y from client
-
-                        // Apply movement on the server based on game rules and PLAYER_SPEED
-                        // Note: This is simplified. In a real game, you'd calculate based on time
-                        // and ensure client inputs don't allow "speed hacks".
-                        player.x += dx;
-                        player.y += dy;
+                        // Client sends dx, dy already scaled by client's PLAYER_SPEED.
+                        // For server authoritative movement, we should apply our own PLAYER_SPEED
+                        // or just use dx, dy if they represent the *intended* movement vector.
+                        // Given the client sends `dx: -PLAYER_SPEED`, we'll just use the values directly.
+                        // If you want server to control speed, client should send normalized direction.
+                        player.x += parsedMessage.dx;
+                        player.y += parsedMessage.dy;
 
                         // Server-side bounds checking (authoritative)
                         player.x = Math.max(PLAYER_RADIUS, Math.min(800 - PLAYER_RADIUS, player.x));
@@ -87,14 +86,24 @@ wss.on('connection', ws => {
                 case 'player_shoot':
                     if (playerId && players[playerId]) {
                         const player = players[playerId];
+                        const now = Date.now();
+
+                        // Server-side cooldown check
+                        if (now - player.lastShotTime < SHOOT_COOLDOWN) {
+                            console.log(`Player ${playerId} tried to shoot too fast.`);
+                            return; // Ignore rapid shots
+                        }
+
+                        player.lastShotTime = now; // Update last shot time on server
+
                         const bulletId = `b_${nextBulletId++}`;
                         bullets[bulletId] = {
                             id: bulletId,
                             ownerId: playerId,
                             x: player.x,
                             y: player.y,
-                            dirX: parsedMessage.bulletDirX,
-                            dirY: parsedMessage.bulletDirY,
+                            dirX: parsedMessage.bulletDirX, // Use client's provided normalized direction
+                            dirY: parsedMessage.bulletDirY, // Use client's provided normalized direction
                             color: player.color,
                             life: BULLET_LIFETIME
                         };
