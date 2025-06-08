@@ -315,6 +315,14 @@
         let hitMarkers = [];
         let particles = [];
 
+        // NEW: Track last sent input state to send only on change
+        let lastSentInputDx = 0;
+        let lastSentInputDy = 0;
+
+        // Used for bullet direction
+        let lastPlayerMoveDirX = 0;
+        let lastPlayerMoveDirY = -1; // Default to shooting up
+
         class Particle {
             constructor(x, y, color, size, speedX, speedY, life) {
                 this.x = x;
@@ -367,7 +375,7 @@
         let ws;
 
         function connectToServer() {
-            const WEBSOCKET_URL = 'wss://game.meho.dpdns.org';
+            const WEBSOCKET_URL = 'wss://game.meho.dpdns.org'; 
 
             ws = new WebSocket(WEBSOCKET_URL);
 
@@ -377,6 +385,8 @@
                 connectionStatusSpan.className = 'connected';
                 ws.send(JSON.stringify({ type: 'player_join', player: localPlayer }));
                 showNotification(`Connected! Welcome, ${localPlayer.id}!`, 'success');
+                // Ensure initial input state is sent on connect
+                sendInputState(); 
             };
 
             ws.onmessage = (event) => {
@@ -397,6 +407,7 @@
                         for (const oldId of currentPlayersIds) {
                             if (oldId !== localPlayer.id && !newPlayersIds.includes(oldId)) {
                                 showNotification(`${otherPlayers[oldId].id} left the game.`, 'warning');
+                                delete otherPlayers[oldId];
                             }
                         }
 
@@ -405,21 +416,21 @@
 
                         // IMPORTANT: For localPlayer, update its position directly from server
                         // This is the "server authoritative" update that corrects client-side prediction
-                        if (otherPlayers[localPlayer.id]) {
-                            localPlayer.x = otherPlayers[localPlayer.id].x;
-                            localPlayer.y = otherPlayers[localPlayer.id].y;
-                            if (localPlayer.health !== otherPlayers[localPlayer.id].health) {
-                                if (localPlayer.health > otherPlayers[localPlayer.id].health) {
+                        if (message.players && message.players[localPlayer.id]) { // Check message.players first
+                            const serverPlayerState = message.players[localPlayer.id];
+                            localPlayer.x = serverPlayerState.x;
+                            localPlayer.y = serverPlayerState.y;
+                            if (localPlayer.health !== serverPlayerState.health) {
+                                if (localPlayer.health > serverPlayerState.health) {
                                     localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
                                     createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
                                 }
-                                localPlayer.health = otherPlayers[localPlayer.id].health;
+                                localPlayer.health = serverPlayerState.health;
                             }
-                            localPlayer.score = otherPlayers[localPlayer.id].score;
+                            localPlayer.score = serverPlayerState.score;
                             delete otherPlayers[localPlayer.id]; // Remove local player from otherPlayers list
                         }
 
-                        // For other players, update their health and flash timer
                         for (const id in otherPlayers) {
                             if (otherPlayers[id]._prevHealth === undefined) {
                                 otherPlayers[id]._prevHealth = otherPlayers[id].health;
@@ -475,6 +486,15 @@
                             showNotification(`${message.player.id} joined the game.`, 'info');
                         }
                         break;
+                    case 'player_id_confirmed':
+                        if (message.id && localPlayer.id !== message.id) {
+                            console.log(`Server confirmed player ID: ${message.id}`);
+                            localPlayer.id = message.id;
+                            playerNameInput.value = message.id;
+                            localStorage.setItem('playerName', message.id);
+                            showNotification(`Your ID was confirmed/adjusted to: ${message.id}`, 'info');
+                        }
+                        break;
                 }
             };
 
@@ -510,55 +530,95 @@
                 const speedY = Math.sin(angle) * speed;
                 const size = Math.random() * 2 + 1;
                 const life = Math.random() * 30 + 20;
-                const r = parseInt(baseColor.substring(4, 7));
-                const g = parseInt(baseColor.substring(8, 11));
-                const b = parseInt(baseColor.substring(12, 15));
-                const particleColor = `rgba(${r + Math.floor(Math.random()*50)}, ${g + Math.floor(Math.random()*50)}, ${b + Math.floor(Math.random()*50)}, 1)`;
+                // Simplified particle color, ideally convert HSL to RGB accurately
+                const r = 200 + Math.floor(Math.random()*55);
+                const g = 200 + Math.floor(Math.random()*55);
+                const b = 200 + Math.floor(Math.random()*55);
+                const particleColor = `rgba(${r}, ${g}, ${b}, 1)`;
                 particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
             }
         }
 
-        function update() {
-            let movedX = 0;
-            let movedY = 0;
+        // NEW: Function to send current input state to server
+        function sendInputState() {
+            let currentInputDx = 0;
+            let currentInputDy = 0;
 
-            // This is the client-side prediction logic
+            if (keys['arrowleft'] || keys['a']) currentInputDx = -1;
+            else if (keys['arrowright'] || keys['d']) currentInputDx = 1;
+
+            if (keys['arrowup'] || keys['w']) currentInputDy = -1;
+            else if (keys['arrowdown'] || keys['s']) currentInputDy = 1;
+
+            if (ws && ws.readyState === WebSocket.OPEN &&
+                (currentInputDx !== lastSentInputDx || currentInputDy !== lastSentInputDy)) {
+                ws.send(JSON.stringify({ type: 'player_input', inputDx: currentInputDx, inputDy: currentInputDy }));
+                lastSentInputDx = currentInputDx;
+                lastSentInputDy = currentInputDy;
+                // console.log(`Sent input: dx=${currentInputDx}, dy=${currentInputDy}`); // Debugging client sends
+            }
+        }
+
+
+        function update() {
+            // Client-side prediction logic
+            // This allows the player to feel responsive even with network lag
+            let currentInputDx = 0;
+            let currentInputDy = 0;
+
             if (keys['arrowup'] || keys['w']) {
                 localPlayer.y -= PLAYER_SPEED;
-                movedY = -PLAYER_SPEED; // Indicate movement for sending to server
+                currentInputDy = -1;
             }
             if (keys['arrowdown'] || keys['s']) {
                 localPlayer.y += PLAYER_SPEED;
-                movedY = PLAYER_SPEED; // Indicate movement for sending to server
+                currentInputDy = 1;
             }
             if (keys['arrowleft'] || keys['a']) {
                 localPlayer.x -= PLAYER_SPEED;
-                movedX = -PLAYER_SPEED; // Indicate movement for sending to server
+                currentInputDx = -1;
             }
             if (keys['arrowright'] || keys['d']) {
                 localPlayer.x += PLAYER_SPEED;
-                movedX = PLAYER_SPEED; // Indicate movement for sending to server
+                currentInputDx = 1;
             }
+
+            // Update player's last move direction for bullet firing
+            // Only update if there's actual movement input
+            if (currentInputDx !== 0 || currentInputDy !== 0) {
+                lastPlayerMoveDirX = currentInputDx;
+                lastPlayerMoveDirY = currentInputDy;
+            }
+            // If no movement input, lastPlayerMoveDirX/Y retains its last value,
+            // so bullets shoot in the last direction moved or default up.
 
             // Clamp local player position to canvas bounds
             localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
-            // Send movement to server if character moved
-            // Note: This sends absolute position (x,y) if server is set up to receive 'player_move'
-            // If your server expects 'player_input' with dx, dy, this will need to change.
-            if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
-            }
+            // NEW: Call sendInputState every frame (it will only send if state changes)
+            sendInputState();
 
+            // Handle shooting
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
                 localPlayer.lastShotTime = Date.now();
 
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
-                // Send shoot action to server
+                let bulletDirX = lastPlayerMoveDirX;
+                let bulletDirY = lastPlayerMoveDirY;
+
+                const magnitude = Math.sqrt(bulletDirX * bulletDirX + bulletDirY * bulletDirY);
+                if (magnitude > 0) {
+                    bulletDirX /= magnitude;
+                    bulletDirY /= magnitude;
+                } else {
+                    bulletDirX = 0;
+                    bulletDirY = -1;
+                }
+
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 })); // Always shoot up for now
+                    ws.send(JSON.stringify({ type: 'player_shoot', bulletDirX: bulletDirX, bulletDirY: bulletDirY }));
                 }
             }
 
@@ -703,39 +763,50 @@
 
         // --- Input Handling (Keyboard) ---
         window.addEventListener('keydown', (e) => {
-            keys[e.key.toLowerCase()] = true;
-            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            const key = e.key.toLowerCase();
+            if (!keys[key]) { // Only send if key state actually changes
+                keys[key] = true;
+                sendInputState(); // Send updated input state
+            }
+            if (key === ' ' || key.startsWith('arrow')) {
                 e.preventDefault();
             }
         });
 
         window.addEventListener('keyup', (e) => {
-            keys[e.key.toLowerCase()] = false;
+            const key = e.key.toLowerCase();
+            if (keys[key]) { // Only send if key state actually changes
+                keys[key] = false;
+                sendInputState(); // Send updated input state
+            }
         });
 
         // --- Mobile/Touch Controls Input Handling (New) ---
         function addTouchAndMouseListeners(element, keyName) {
             const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
             const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
-            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave'; // For when finger slides off or mouse leaves
+            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave';
 
             element.addEventListener(startEvent, (e) => {
-                e.preventDefault(); // Prevent scrolling/default behavior
-                keys[keyName] = true;
-                // console.log(`Button ${keyName} pressed`); // Debugging mobile input
-            }, { passive: false }); // passive: false to allow preventDefault
+                e.preventDefault();
+                if (!keys[keyName]) { // Only set and send if state changes
+                    keys[keyName] = true;
+                    sendInputState();
+                }
+            }, { passive: false });
 
             element.addEventListener(endEvent, (e) => {
                 e.preventDefault();
-                keys[keyName] = false;
-                // console.log(`Button ${keyName} released`); // Debugging mobile input
+                if (keys[keyName]) { // Only unset and send if state changes
+                    keys[keyName] = false;
+                    sendInputState();
+                }
             });
 
-            // Handle cases where touch/mouse leaves the button area before release
             element.addEventListener(leaveEvent, (e) => {
-                 if (keys[keyName]) { // Only if it was previously pressed by this interaction
+                 if (keys[keyName]) {
                     keys[keyName] = false;
-                    // console.log(`Button ${keyName} left area, released`);
+                    sendInputState();
                  }
             });
         }
