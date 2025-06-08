@@ -311,7 +311,9 @@
             hitFlashTimer: 0,
             // New properties for reconciliation
             targetX: canvas.width / 2,
-            targetY: canvas.height / 2
+            targetY: canvas.height / 2,
+            inputSequence: 0, // 客户端的输入序列号
+            pendingInputs: [] // 存储待服务器确认的输入
         };
 
         let otherPlayers = {};
@@ -417,18 +419,49 @@
 
                         // Update local player state from server (for reconciliation)
                         if (message.players[localPlayer.id]) {
-                            localPlayer.targetX = message.players[localPlayer.id].x;
-                            localPlayer.targetY = message.players[localPlayer.id].y;
-                            
+                            const serverLocalPlayer = message.players[localPlayer.id];
+
                             // Update health and score directly as they are not predicted by movement
-                            if (localPlayer.health !== message.players[localPlayer.id].health) {
-                                if (localPlayer.health > message.players[localPlayer.id].health) {
+                            if (localPlayer.health !== serverLocalPlayer.health) {
+                                if (localPlayer.health > serverLocalPlayer.health) {
                                     localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
                                     createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
                                 }
-                                localPlayer.health = message.players[localPlayer.id].health;
+                                localPlayer.health = serverLocalPlayer.health;
                             }
-                            localPlayer.score = message.players[localPlayer.id].score;
+                            localPlayer.score = serverLocalPlayer.score;
+
+                            // *** Reconciliation: Re-simulate unacknowledged inputs ***
+                            // Remove inputs that the server has already processed
+                            localPlayer.pendingInputs = localPlayer.pendingInputs.filter(input => 
+                                input.sequence > serverLocalPlayer.lastProcessedInputSequence
+                            );
+
+                            // Calculate the reconciled predicted position
+                            // Start with server's authoritative position
+                            let reconciledPredictedX = serverLocalPlayer.x;
+                            let reconciledPredictedY = serverLocalPlayer.y;
+
+                            // Re-apply all pending (unacknowledged) inputs to this calculated position
+                            localPlayer.pendingInputs.forEach(input => {
+                                let reSimDx = 0;
+                                let reSimDy = 0;
+                                if (input.inputState.up) reSimDy -= PLAYER_SPEED;
+                                if (input.inputState.down) reSimDy += PLAYER_SPEED;
+                                if (input.inputState.left) reSimDx -= PLAYER_SPEED;
+                                if (input.inputState.right) reSimDx += PLAYER_SPEED;
+
+                                reconciledPredictedX += reSimDx;
+                                reconciledPredictedY += reSimDy;
+                                // Re-clamp re-simulated position
+                                reconciledPredictedX = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, reconciledPredictedX));
+                                reconciledPredictedY = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, reconciledPredictedY));
+                            });
+
+                            // Set the target for reconciliation to this calculated reconciled predicted position
+                            // localPlayer.x and localPlayer.y will then smoothly move towards this target in the update loop
+                            localPlayer.targetX = reconciledPredictedX;
+                            localPlayer.targetY = reconciledPredictedY;
                         }
 
                         // Update other players' states for interpolation
@@ -499,6 +532,7 @@
                                 showNotification(`${hitPlayer.id === localPlayer.id ? 'You' : hitPlayer.id} were hit!`, 'warning', 1500);
                             }
                         }
+                        // Corrected: Use message.hitY instead of message.y
                         if (message.hitX && message.hitY) {
                             hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION });
                         }
@@ -611,41 +645,57 @@
         }
 
         function update() {
-            let dx = 0; // Normalized direction X
-            let dy = 0; // Normalized direction Y
+            let currentInputState = {
+                up: keys['arrowup'] || keys['w'],
+                down: keys['arrowdown'] || keys['s'],
+                left: keys['arrowleft'] || keys['a'],
+                right: keys['arrowright'] || keys['d']
+            };
 
-            // Calculate desired movement based on input (normalized directions)
-            if (keys['arrowup'] || keys['w']) {
-                dy = -1;
+            let dx = 0;
+            let dy = 0;
+
+            // Calculate desired movement based on current input state
+            if (currentInputState.up) {
+                dy -= PLAYER_SPEED;
             }
-            if (keys['arrowdown'] || keys['s']) {
-                dy = 1;
+            if (currentInputState.down) {
+                dy += PLAYER_SPEED;
             }
-            if (keys['arrowleft'] || keys['a']) {
-                dx = -1;
+            if (currentInputState.left) {
+                dx -= PLAYER_SPEED;
             }
-            if (keys['arrowright'] || keys['d']) {
-                dx = 1;
+            if (currentInputState.right) {
+                dx += PLAYER_SPEED;
             }
 
-            // Client-side prediction: immediately apply movement using CLIENT's PLAYER_SPEED
-            localPlayer.x += dx * PLAYER_SPEED;
-            localPlayer.y += dy * PLAYER_SPEED;
+            // Client-side prediction: immediately apply movement
+            localPlayer.x += dx;
+            localPlayer.y += dy;
 
             // Clamp local player predicted position to canvas bounds
             localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
             // Server reconciliation: gently adjust local player position towards the server's authoritative position
+            // This happens AFTER re-simulating pending inputs (which is handled in onmessage now)
             if (localPlayer.targetX !== undefined && localPlayer.targetY !== undefined) {
                 localPlayer.x += (localPlayer.targetX - localPlayer.x) * RECONCILIATION_FACTOR;
                 localPlayer.y += (localPlayer.targetY - localPlayer.y) * RECONCILIATION_FACTOR;
             }
 
-            // Send movement input (normalized dx, dy) to the server
-            // Only send if there's actual input to avoid unnecessary network traffic
-            if (ws && ws.readyState === WebSocket.OPEN && (dx !== 0 || dy !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_input', dx: dx, dy: dy }));
+            // Send movement input (full input state and sequence) to the server
+            // Only send if there's actual movement or input state has changed
+            // For simplicity, we send every frame if any key is pressed, or if there were pending inputs.
+            // A more advanced approach would only send on input change or at fixed intervals.
+            if (ws && ws.readyState === WebSocket.OPEN && (dx !== 0 || dy !== 0 || localPlayer.pendingInputs.length > 0)) {
+                localPlayer.inputSequence++; // Increment sequence for this input
+                const inputPacket = {
+                    sequence: localPlayer.inputSequence,
+                    inputState: currentInputState
+                };
+                localPlayer.pendingInputs.push(inputPacket); // Store this input for future reconciliation
+                ws.send(JSON.stringify({ type: 'player_input', sequence: inputPacket.sequence, inputState: inputPacket.inputState }));
             }
 
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
@@ -724,6 +774,93 @@
                     otherPlayers[id].hitFlashTimer--;
                 }
             }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            bullets.forEach(bullet => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = bullet.color;
+                ctx.fill();
+
+                const trailLength = BULLET_SPEED * 2;
+                ctx.beginPath();
+                ctx.moveTo(bullet.x, bullet.y);
+                ctx.lineTo(bullet.x - bullet.dirX * trailLength, bullet.y - bullet.dirY * trailLength);
+                ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+
+            muzzleFlashes.forEach(flash => {
+                const opacity = flash.timer / MUZZLE_FLASH_DURATION;
+                ctx.save();
+                ctx.globalAlpha = opacity;
+                ctx.fillStyle = `rgba(255, 255, 0, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(flash.x, flash.y, PLAYER_RADIUS * 0.8 * (1 - opacity) + PLAYER_RADIUS * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            for (const id in otherPlayers) {
+                const player = otherPlayers[id];
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = player.color;
+                ctx.fill();
+                ctx.strokeStyle = player.hitFlashTimer > 0 ? 'red' : 'white';
+                ctx.lineWidth = player.hitFlashTimer > 0 ? 4 : 2;
+                ctx.stroke();
+
+                ctx.fillStyle = 'red';
+                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
+                ctx.fillStyle = 'lime';
+                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (player.health / 100), 5);
+
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${player.id} (Score: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 10);
+            }
+
+            ctx.beginPath();
+            ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = localPlayer.color;
+            ctx.fill();
+            ctx.strokeStyle = localPlayer.hitFlashTimer > 0 ? 'red' : 'gold';
+            ctx.lineWidth = localPlayer.hitFlashTimer > 0 ? 5 : 3;
+            ctx.stroke();
+
+            ctx.fillStyle = 'red';
+            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
+            ctx.fillStyle = 'lime';
+            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (localPlayer.health / 100), 5);
+
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`You (${localPlayer.id}) Score: ${localPlayer.score}`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
+
+            hitMarkers.forEach(marker => {
+                const opacity = marker.timer / HIT_MARKER_DURATION;
+                ctx.save();
+                ctx.globalAlpha = opacity;
+                ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.lineWidth = 2;
+                const size = 10;
+                ctx.beginPath();
+                ctx.moveTo(marker.x - size / 2, marker.y - size / 2);
+                ctx.lineTo(marker.x + size / 2, marker.y + size / 2);
+                ctx.moveTo(marker.x + size / 2, marker.y - size / 2);
+                ctx.lineTo(marker.x - size / 2, marker.y + size / 2);
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            particles.forEach(p => p.draw(ctx));
         }
 
         function gameLoop() {
