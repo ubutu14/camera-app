@@ -302,7 +302,7 @@
             health: 100,
             score: 0,
             lastShotTime: 0,
-            shootCooldown: 200,
+            shootCooldown: 200, // Client-side cooldown for responsiveness
             muzzleFlashTimer: 0,
             hitFlashTimer: 0
         };
@@ -314,6 +314,9 @@
         let muzzleFlashes = [];
         let hitMarkers = [];
         let particles = [];
+
+        let mouseX = 0; // Global for mouse/touch aiming
+        let mouseY = 0; // Global for mouse/touch aiming
 
         class Particle {
             constructor(x, y, color, size, speedX, speedY, life) {
@@ -384,60 +387,58 @@
 
                 switch (message.type) {
                     case 'game_state_update':
-                        const currentPlayersIds = Object.keys(otherPlayers);
-                        const newPlayersIds = Object.keys(message.players || {});
+                        // Update local player's authoritative state (position, health, score)
+                        if (message.players[localPlayer.id]) {
+                            localPlayer.x = message.players[localPlayer.id].x;
+                            localPlayer.y = message.players[localPlayer.id].y;
+                            localPlayer.health = message.players[localPlayer.id].health;
+                            localPlayer.score = message.players[localPlayer.id].score;
+                        }
 
-                        for (const newId of newPlayersIds) {
-                            if (newId !== localPlayer.id && !currentPlayersIds.includes(newId) && message.players[newId]) {
-                                showNotification(`${message.players[newId].id} joined the game.`, 'info');
-                                message.players[newId]._prevHealth = message.players[newId].health;
+                        // Process other players
+                        const serverPlayerIds = Object.keys(message.players);
+                        const currentClientPlayerIds = Object.keys(otherPlayers);
+
+                        // Add new players and update existing ones (for interpolation)
+                        for (const id of serverPlayerIds) {
+                            if (id === localPlayer.id) continue; // Skip local player
+
+                            const serverPlayer = message.players[id];
+                            if (!otherPlayers[id]) {
+                                // New player joined
+                                otherPlayers[id] = { ...serverPlayer };
+                                // Initialize interpolation targets
+                                otherPlayers[id].targetX = serverPlayer.x;
+                                otherPlayers[id].targetY = serverPlayer.y;
+                                otherPlayers[id].lastServerX = serverPlayer.x;
+                                otherPlayers[id].lastServerY = serverPlayer.y;
+                                otherPlayers[id].hitFlashTimer = 0; // Initialize
+                                showNotification(`${serverPlayer.id} joined the game.`, 'info');
+                            } else {
+                                const clientPlayer = otherPlayers[id];
+                                // Store current client position as 'lastServer' for interpolation
+                                clientPlayer.lastServerX = clientPlayer.targetX;
+                                clientPlayer.lastServerY = clientPlayer.targetY;
+                                // Set new target from server
+                                clientPlayer.targetX = serverPlayer.x;
+                                clientPlayer.targetY = serverPlayer.y;
+                                clientPlayer.health = serverPlayer.health; // Always authoritative health
+                                clientPlayer.score = serverPlayer.score;
+                                clientPlayer.color = serverPlayer.color;
+                                // hitFlashTimer is managed by 'player_hit' message
                             }
                         }
 
-                        for (const oldId of currentPlayersIds) {
-                            if (oldId !== localPlayer.id && !newPlayersIds.includes(oldId)) {
-                                showNotification(`${otherPlayers[oldId].id} left the game.`, 'warning');
+                        // Remove disconnected players
+                        for (const id of currentClientPlayerIds) {
+                            if (!serverPlayerIds.includes(id)) {
+                                showNotification(`${otherPlayers[id].id} left the game.`, 'warning');
+                                delete otherPlayers[id];
                             }
                         }
 
-                        otherPlayers = message.players || {};
+                        // Update bullets directly (bullets don't need interpolation as they are short-lived and server authoritative)
                         bullets = message.bullets || [];
-
-                        // IMPORTANT: For localPlayer, update its position directly from server
-                        // This is the "server authoritative" update that corrects client-side prediction
-                        if (otherPlayers[localPlayer.id]) {
-                            localPlayer.x = otherPlayers[localPlayer.id].x;
-                            localPlayer.y = otherPlayers[localPlayer.id].y;
-                            if (localPlayer.health !== otherPlayers[localPlayer.id].health) {
-                                if (localPlayer.health > otherPlayers[localPlayer.id].health) {
-                                    localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                    createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
-                                }
-                                localPlayer.health = otherPlayers[localPlayer.id].health;
-                            }
-                            localPlayer.score = otherPlayers[localPlayer.id].score;
-                            delete otherPlayers[localPlayer.id]; // Remove local player from otherPlayers list
-                        }
-
-                        // For other players, update their health and flash timer
-                        for (const id in otherPlayers) {
-                            if (otherPlayers[id]._prevHealth === undefined) {
-                                otherPlayers[id]._prevHealth = otherPlayers[id].health;
-                            }
-
-                            if (otherPlayers[id].health !== otherPlayers[id]._prevHealth) {
-                                if (otherPlayers[id].health < otherPlayers[id]._prevHealth) {
-                                    otherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                    createImpactParticles(otherPlayers[id].x, otherPlayers[id].y, otherPlayers[id].color);
-                                    if (otherPlayers[id].health <= 0) {
-                                        showNotification(`${otherPlayers[id].id} was defeated!`, 'error');
-                                    } else {
-                                        showNotification(`${otherPlayers[id].id} was hit!`, 'warning', 1500);
-                                    }
-                                }
-                            }
-                            otherPlayers[id]._prevHealth = otherPlayers[id].health;
-                        }
                         break;
                     case 'player_hit':
                         if (message.id === localPlayer.id) {
@@ -471,8 +472,17 @@
                         }
                         break;
                     case 'player_joined':
+                        // This message is primarily for notification; actual player data handled in game_state_update
                         if (message.player && message.player.id !== localPlayer.id) {
-                            showNotification(`${message.player.id} joined the game.`, 'info');
+                            // showNotification(`${message.player.id} joined the game.`, 'info'); // Already handled by game_state_update
+                        }
+                        break;
+                    case 'player_id_confirmed':
+                        if (localPlayer.id !== message.id) {
+                            console.log(`Server confirmed player ID changed from ${localPlayer.id} to ${message.id}`);
+                            showNotification(`Your name was adjusted to: ${message.id}`, 'info');
+                            localPlayer.id = message.id;
+                            localStorage.setItem('playerName', message.id); // Save the confirmed ID
                         }
                         break;
                 }
@@ -510,59 +520,85 @@
                 const speedY = Math.sin(angle) * speed;
                 const size = Math.random() * 2 + 1;
                 const life = Math.random() * 30 + 20;
-                const r = parseInt(baseColor.substring(4, 7));
-                const g = parseInt(baseColor.substring(8, 11));
-                const b = parseInt(baseColor.substring(12, 15));
-                const particleColor = `rgba(${r + Math.floor(Math.random()*50)}, ${g + Math.floor(Math.random()*50)}, ${b + Math.floor(Math.random()*50)}, 1)`;
-                particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
+                // Parse color string (assuming hsl or rgb for now, could be improved)
+                let r, g, b;
+                if (baseColor.startsWith('hsl')) {
+                    // Simple conversion for particle color variation
+                    const hsl = baseColor.match(/\d+/g).map(Number);
+                    const hue = hsl[0];
+                    const saturation = hsl[1] / 100;
+                    const lightness = hsl[2] / 100;
+                    // For simplicity, just use a slightly different hue for particles
+                    const particleHue = (hue + (Math.random() * 20 - 10)) % 360;
+                    const particleLightness = Math.min(100, (lightness * 100) + (Math.random() * 20 - 10));
+                    particles.push(new Particle(x, y, `hsl(${particleHue}, 70%, ${particleLightness}%)`, size, speedX, speedY, life));
+                } else { // Assume it's a simple color string or rgba for now
+                    particles.push(new Particle(x, y, baseColor, size, speedX, speedY, life));
+                }
             }
         }
 
         function update() {
-            let movedX = 0;
-            let movedY = 0;
+            let inputDx = 0;
+            let inputDy = 0;
 
-            // This is the client-side prediction logic
+            // This is the client-side prediction logic for local player
             if (keys['arrowup'] || keys['w']) {
                 localPlayer.y -= PLAYER_SPEED;
-                movedY = -PLAYER_SPEED; // Indicate movement for sending to server
+                inputDy -= PLAYER_SPEED;
             }
             if (keys['arrowdown'] || keys['s']) {
                 localPlayer.y += PLAYER_SPEED;
-                movedY = PLAYER_SPEED; // Indicate movement for sending to server
+                inputDy += PLAYER_SPEED;
             }
             if (keys['arrowleft'] || keys['a']) {
                 localPlayer.x -= PLAYER_SPEED;
-                movedX = -PLAYER_SPEED; // Indicate movement for sending to server
+                inputDx -= PLAYER_SPEED;
             }
             if (keys['arrowright'] || keys['d']) {
                 localPlayer.x += PLAYER_SPEED;
-                movedX = PLAYER_SPEED; // Indicate movement for sending to server
+                inputDx += PLAYER_SPEED;
             }
 
-            // Clamp local player position to canvas bounds
+            // Clamp local player position to canvas bounds (client-side prediction)
             localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
             // Send movement to server if character moved
-            // Note: This sends absolute position (x,y) if server is set up to receive 'player_move'
-            // If your server expects 'player_input' with dx, dy, this will need to change.
-            if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
+            if (ws && ws.readyState === WebSocket.OPEN && (inputDx !== 0 || inputDy !== 0)) {
+                ws.send(JSON.stringify({ type: 'player_input', dx: inputDx, dy: inputDy }));
             }
 
+            // Client-side shoot cooldown
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
                 localPlayer.lastShotTime = Date.now();
 
+                // Calculate bullet direction based on mouse/aim
+                const targetX = mouseX;
+                const targetY = mouseY;
+
+                let dirX = targetX - localPlayer.x;
+                let dirY = targetY - localPlayer.y;
+
+                const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
+                if (magnitude > 0) {
+                    dirX /= magnitude; // Normalize direction vector
+                    dirY /= magnitude;
+                } else {
+                    // Default direction if no movement (e.g., straight up)
+                    dirY = -1;
+                    dirX = 0;
+                }
+
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
-                // Send shoot action to server
+                // Send shoot action to server with calculated direction
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 })); // Always shoot up for now
+                    ws.send(JSON.stringify({ type: 'player_shoot', bulletDirX: dirX, bulletDirY: dirY }));
                 }
             }
 
-            // Update bullets (client-side prediction)
+            // Update bullets (client-side prediction - these will be corrected by server updates)
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.x += bullet.dirX * BULLET_SPEED;
@@ -576,7 +612,17 @@
                 }
             }
 
-            // Update visual effects
+            // Interpolate other players' positions for smoother movement
+            const INTERPOLATION_FACTOR = 0.15; // Adjust for smoother/snappier movement
+            for (const id in otherPlayers) {
+                const player = otherPlayers[id];
+                if (player.targetX !== undefined && player.targetY !== undefined) {
+                    player.x += (player.targetX - player.x) * INTERPOLATION_FACTOR;
+                    player.y += (player.targetY - player.y) * INTERPOLATION_FACTOR;
+                }
+            }
+
+            // Update visual effects timers
             for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
                 muzzleFlashes[i].timer--;
                 if (muzzleFlashes[i].timer <= 0) {
@@ -713,6 +759,22 @@
             keys[e.key.toLowerCase()] = false;
         });
 
+        // --- Mouse/Touch Aiming Input Handling ---
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+        });
+
+        // For touch aiming, track the first touch point
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                mouseX = e.touches[0].clientX - rect.left;
+                mouseY = e.touches[0].clientY - rect.top;
+            }
+        }, { passive: false }); // passive: false to allow preventDefault
+
         // --- Mobile/Touch Controls Input Handling (New) ---
         function addTouchAndMouseListeners(element, keyName) {
             const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
@@ -722,20 +784,17 @@
             element.addEventListener(startEvent, (e) => {
                 e.preventDefault(); // Prevent scrolling/default behavior
                 keys[keyName] = true;
-                // console.log(`Button ${keyName} pressed`); // Debugging mobile input
             }, { passive: false }); // passive: false to allow preventDefault
 
             element.addEventListener(endEvent, (e) => {
                 e.preventDefault();
                 keys[keyName] = false;
-                // console.log(`Button ${keyName} released`); // Debugging mobile input
             });
 
             // Handle cases where touch/mouse leaves the button area before release
             element.addEventListener(leaveEvent, (e) => {
                  if (keys[keyName]) { // Only if it was previously pressed by this interaction
                     keys[keyName] = false;
-                    // console.log(`Button ${keyName} left area, released`);
                  }
             });
         }
@@ -819,9 +878,9 @@
                 localStorage.setItem('playerName', newName);
                 showNotification(`Your name set to: ${newName}. Reconnecting...`, 'info');
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.close();
+                    ws.close(); // Close existing connection to trigger reconnect with new ID
                 } else {
-                    connectToServer();
+                    connectToServer(); // If not connected, just connect
                 }
             } else {
                 showNotification(`Name is already ${newName}.`, 'info', 1500);
