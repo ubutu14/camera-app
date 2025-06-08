@@ -1,26 +1,16 @@
-const WebSocket = require('ws');
-const http = require('http');
-
-const server = http.createServer((req, res) => {
-    // A simple HTTP response for health checks or if someone tries to browse directly
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Multiplayer Game Server is Running!');
-});
-
-const wss = new WebSocket.Server({ server });
+// ... (之前的代码)
 
 const players = {}; // Stores all connected players' states
 const bullets = {}; // Stores all active bullets' states
 
 // --- Game Settings (Server-side authoritative) ---
 const GAME_TICK_RATE = 1000 / 60; // 60 updates per second
-const PLAYER_SPEED = 3; // Server's authoritative player speed
+const PLAYER_SPEED = 3; // IMPORTANT: This must be consistent with client's PLAYER_SPEED conceptually, but server is authoritative
 const BULLET_SPEED = 10;
 const PLAYER_RADIUS = 15;
 const BULLET_RADIUS = 3;
 const BULLET_LIFETIME = 60; // frames (adjust if your client's bullet lifetime is different)
 const MAX_HEALTH = 100;
-const SHOOT_COOLDOWN = 200; // milliseconds
 
 let nextBulletId = 0; // Simple ID counter for bullets
 
@@ -51,7 +41,8 @@ wss.on('connection', ws => {
                         color: parsedMessage.player.color,
                         health: MAX_HEALTH, // Always start with full health on server
                         score: 0,
-                        lastShotTime: 0 // Initialize last shot time for server-side cooldown
+                        lastProcessedInputSequence: 0, // 新增: 跟踪最新处理的输入序列号
+                        inputState: { up: false, down: false, left: false, right: false } // 新增: 存储当前输入状态
                     };
                     console.log(`Player ${playerId} joined.`);
                     // Send back the confirmed player ID to the client if it was adjusted
@@ -69,41 +60,26 @@ wss.on('connection', ws => {
                 case 'player_input':
                     if (playerId && players[playerId]) {
                         const player = players[playerId];
-                        // Client sends dx, dy already scaled by client's PLAYER_SPEED.
-                        // For server authoritative movement, we should apply our own PLAYER_SPEED
-                        // or just use dx, dy if they represent the *intended* movement vector.
-                        // Given the client sends `dx: -PLAYER_SPEED`, we'll just use the values directly.
-                        // If you want server to control speed, client should send normalized direction.
-                        player.x += parsedMessage.dx;
-                        player.y += parsedMessage.dy;
+                        const inputState = parsedMessage.inputState; // 新增: 接收完整的输入状态
+                        const sequence = parsedMessage.sequence;       // 新增: 接收序列号
 
-                        // Server-side bounds checking (authoritative)
-                        player.x = Math.max(PLAYER_RADIUS, Math.min(800 - PLAYER_RADIUS, player.x));
-                        player.y = Math.max(PLAYER_RADIUS, Math.min(600 - PLAYER_RADIUS, player.y));
+                        // 更新玩家的最新处理输入序列号和输入状态
+                        player.lastProcessedInputSequence = sequence;
+                        player.inputState = inputState; // 存储最新输入状态，在游戏循环中处理
                     }
                     break;
 
                 case 'player_shoot':
                     if (playerId && players[playerId]) {
                         const player = players[playerId];
-                        const now = Date.now();
-
-                        // Server-side cooldown check
-                        if (now - player.lastShotTime < SHOOT_COOLDOWN) {
-                            console.log(`Player ${playerId} tried to shoot too fast.`);
-                            return; // Ignore rapid shots
-                        }
-
-                        player.lastShotTime = now; // Update last shot time on server
-
                         const bulletId = `b_${nextBulletId++}`;
                         bullets[bulletId] = {
                             id: bulletId,
                             ownerId: playerId,
                             x: player.x,
                             y: player.y,
-                            dirX: parsedMessage.bulletDirX, // Use client's provided normalized direction
-                            dirY: parsedMessage.bulletDirY, // Use client's provided normalized direction
+                            dirX: parsedMessage.bulletDirX,
+                            dirY: parsedMessage.bulletDirY,
                             color: player.color,
                             life: BULLET_LIFETIME
                         };
@@ -141,6 +117,28 @@ wss.on('connection', ws => {
 
 // --- Server Game Loop ---
 setInterval(() => {
+    // 0. Process Player Movement based on stored inputState (Server Authoritative)
+    for (const playerId in players) {
+        const player = players[playerId];
+        const inputState = player.inputState;
+
+        let dx = 0;
+        let dy = 0;
+
+        if (inputState.up) dy -= PLAYER_SPEED;
+        if (inputState.down) dy += PLAYER_SPEED;
+        if (inputState.left) dx -= PLAYER_SPEED;
+        if (inputState.right) dx += PLAYER_SPEED;
+
+        // Apply movement
+        player.x += dx;
+        player.y += dy;
+
+        // Server-side bounds checking (authoritative)
+        player.x = Math.max(PLAYER_RADIUS, Math.min(800 - PLAYER_RADIUS, player.x));
+        player.y = Math.max(PLAYER_RADIUS, Math.min(600 - PLAYER_RADIUS, player.y));
+    }
+
     // 1. Update bullet positions and check for expiration
     for (const bulletId in bullets) {
         const bullet = bullets[bulletId];
@@ -209,9 +207,10 @@ setInterval(() => {
     }
 
     // 3. Prepare game state for clients
+    // Ensure that for the local player, the lastProcessedInputSequence is included in the player object
     const gameState = {
         type: 'game_state_update',
-        players: players, // Send all players' current authoritative states
+        players: players, // Send all players' current authoritative states (including lastProcessedInputSequence)
         bullets: Object.values(bullets) // Send bullets as an array
     };
 
