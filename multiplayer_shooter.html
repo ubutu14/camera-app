@@ -3,133 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multiplayer 2D Shooter (Client)</title>
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+        }
+
+        html, body {
+            height: 100%; /* Ensure html and body take full viewport height */
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center;
+            justify-content: flex-start; /* Align items to the top to allow content flow */
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            padding: 20px; /* Keep padding for overall aesthetic */
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            overflow: hidden; /* Keep hidden for the main body to prevent overall scrollbars */
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            flex-shrink: 0; /* Prevent h1 from shrinking */
+        }
+
+        .ui-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #222;
-            color: #eee;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-            -webkit-touch-callout: none; /* iOS Safari */
-            -webkit-user-select: none; /* Safari */
-            -khtml-user-select: none; /* Konqueror HTML */
-            -moz-user-select: none; /* Old versions of Firefox */
-            -ms-user-select: none; /* Internet Explorer/Edge */
-            user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
-            touch-action: manipulation; /* Prevent default touch actions like double-tap zoom */
-        }
-        canvas {
-            background-color: #333;
-            border: 2px solid #555;
-            display: block;
-            margin-bottom: 20px;
-        }
-        .info-panel {
-            background-color: #444;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            text-align: left;
-            max-width: 600px;
+            gap: 15px;
             width: 100%;
-            margin-top: 20px;
+            max-width: 800px;
+            
+            /* NEW: Make this container scrollable if its content overflows */
+            flex-grow: 1; /* Allow it to grow and take available space */
+            overflow-y: auto; /* Enable vertical scrolling if content overflows */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            padding: 0; /* Let inner elements handle their own padding/margin */
+            box-sizing: border-box;
+            /* Add some padding for the scrollable content itself */
+            padding-bottom: 20px; /* Add space at the bottom when scrolled */
         }
-        .info-panel h2 {
+
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 0; /* Removed margin-bottom here as gap handles spacing */
+            border-radius: 8px;
+            flex-shrink: 0; /* Prevent canvas from shrinking on smaller screens */
+        }
+
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
             margin-top: 0;
-            color: #007bff;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
         }
-        .info-panel p {
-            margin-bottom: 5px;
-        }
-        .info-panel kbd {
-            background-color: #555;
-            padding: 2px 4px;
-            border-radius: 3px;
-        }
-        .status {
-            color: yellow;
-        }
-        .disconnected {
-            color: red;
-        }
-        .connected {
-            color: limegreen;
-        }
-        .controls-info {
-            margin-top: 15px;
-            font-size: 0.9em;
-        }
-        .game-controls, .player-setup {
+
+        .panel p {
             margin-bottom: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
+            line-height: 1.5;
         }
-        .game-controls button, .player-setup button, .player-setup input[type="text"] {
-            background-color: #007bff;
+
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
             color: white;
-            padding: 10px 20px;
+            padding: 12px 25px;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 1em;
             vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
         }
-        .player-setup input[type="text"] {
+
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], input[type="color"] {
             background-color: #555;
-            color: white;
-            border: 1px solid #777;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
             text-align: center;
-            width: 150px;
+            width: 180px;
+            box-sizing: border-box;
         }
-        .game-controls button:hover, .player-setup button:hover {
-            background-color: #0056b3;
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
         }
+
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
 
         /* Notification Area */
         #notification-area {
             position: absolute;
             top: 20px;
             right: 20px;
-            width: 250px;
+            width: 280px; /* Slightly wider */
             max-height: 80vh;
             overflow-y: auto;
             pointer-events: none;
             z-index: 1000;
         }
         .notification {
-            background-color: rgba(0, 0, 0, 0.7);
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
             color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-bottom: 10px;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
             opacity: 0;
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
             transform: translateX(100%);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
             pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
         }
-        .notification.show {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        .notification.hide {
-            opacity: 0;
-            transform: translateX(100%);
-        }
-        .notification.info { background-color: rgba(0, 123, 255, 0.7); }
-        .notification.success { background-color: rgba(40, 167, 69, 0.7); }
-        .notification.warning { background-color: rgba(255, 193, 7, 0.7); }
-        .notification.error { background-color: rgba(220, 53, 69, 0.7); }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
 
         /* Mobile Controls */
         .mobile-controls-container {
@@ -137,801 +210,1181 @@
             justify-content: space-between;
             align-items: flex-end;
             width: 100%;
-            max-width: 800px; /* Match canvas width */
-            margin-top: 20px;
+            max-width: 800px;
+            margin-top: 0; /* Gap handles spacing */
             padding: 10px 0;
+            flex-shrink: 0; /* Prevent from shrinking */
         }
 
         .d-pad {
             display: grid;
             grid-template-columns: repeat(3, 60px);
             grid-template-rows: repeat(3, 60px);
-            gap: 5px;
-            background-color: #444;
-            border-radius: 10px;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
         }
         .d-pad button {
             width: 100%;
             height: 100%;
-            background-color: #007bff;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
             color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 1.2em;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: background-color 0.1s ease;
-            -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on tap */
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
         .d-pad button:active {
-            background-color: #0056b3;
-            transform: scale(0.95);
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
         }
         .d-pad button:hover {
-            background-color: #0056b3;
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
         }
-
-        .d-pad .up { grid-area: 1 / 2 / 2 / 3; }
-        .d-pad .left { grid-area: 2 / 1 / 3 / 2; }
-        .d-pad .center { grid-area: 2 / 2 / 3 / 3; visibility: hidden; } /* Placeholder for center, hidden */
-        .d-pad .right { grid-area: 2 / 3 / 3 / 4; }
-        .d-pad .down { grid-area: 3 / 2 / 4 / 3; }
+        .d-pad .center { visibility: hidden; }
 
         .action-buttons {
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            margin-right: 20px; /* Space from right edge */
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
         }
         .action-buttons button {
-            background-color: #28a745; /* Green for shoot */
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
             color: white;
-            padding: 20px 30px;
+            padding: 25px 35px; /* Larger padding */
             border: none;
-            border-radius: 50%; /* Make it circular */
-            font-size: 1.5em;
-            width: 90px;
-            height: 90px;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            transition: background-color 0.1s ease, transform 0.1s ease;
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+        }
+
+        html, body {
+            height: 100%; /* Ensure html and body take full viewport height */
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center;
+            justify-content: flex-start; /* Align items to the top to allow content flow */
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            padding: 20px; /* Keep padding for overall aesthetic */
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            overflow: hidden; /* Keep hidden for the main body to prevent overall scrollbars */
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            flex-shrink: 0; /* Prevent h1 from shrinking */
+        }
+
+        .ui-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            
+            /* NEW: Make this container scrollable if its content overflows */
+            flex-grow: 1; /* Allow it to grow and take available space */
+            overflow-y: auto; /* Enable vertical scrolling if content overflows */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            padding: 0; /* Let inner elements handle their own padding/margin */
+            box-sizing: border-box;
+            /* Add some padding for the scrollable content itself */
+            padding-bottom: 20px; /* Add space at the bottom when scrolled */
+        }
+
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 0; /* Removed margin-bottom here as gap handles spacing */
+            border-radius: 8px;
+            flex-shrink: 0; /* Prevent canvas from shrinking on smaller screens */
+        }
+
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .panel p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
             -webkit-tap-highlight-color: transparent;
         }
-        .action-buttons button:active {
-            background-color: #218838;
-            transform: scale(0.95);
-        }
-        .action-buttons button:hover {
-            background-color: #218838;
-        }
-    </style>
-</head>
-<body>
-    <div id="notification-area"></div>
 
-    <h1>Multiplayer 2D Shooter (Client Demo)</h1>
-
-    <div class="player-setup">
-        <label for="playerNameInput">Your Name:</label>
-        <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="12">
-        <button id="setPlayerNameButton">Set Name</button>
-    </div>
-
-    <div class="game-controls">
-        <button id="fullscreenButton">Toggle Fullscreen</button>
-    </div>
-
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-
-    <!-- Mobile Controls -->
-    <div class="mobile-controls-container">
-        <div class="d-pad">
-            <button id="moveUp" class="up">↑</button>
-            <button id="moveLeft" class="left">←</button>
-            <div class="center"></div> <!-- Placeholder -->
-            <button id="moveRight" class="right">→</button>
-            <button id="moveDown" class="down">↓</button>
-        </div>
-        <div class="action-buttons">
-            <button id="shootButton">SHOOT</button>
-        </div>
-    </div>
-
-    <div class="info-panel">
-        <h2>Game Status: <span id="connectionStatus" class="disconnected">Disconnected</span></h2>
-        <p>This is a **client-side demonstration** of a multiplayer game concept.</p>
-        <p>It simulates sending and receiving game state updates via WebSockets.</p>
-        <p>A **real multiplayer game** requires a dedicated **server** (e.js, Node.js, Python, Go) to manage game logic, player synchronization, and communication between all clients.</p>
-        <p class="controls-info"><strong>Controls:</strong>
-            <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen D-Pad**
-            <br>Shoot: <kbd>Spacebar</kbd> / **On-screen SHOOT button**
-        </p>
-    </div>
-
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const connectionStatusSpan = document.getElementById('connectionStatus');
-        const fullscreenButton = document.getElementById('fullscreenButton');
-        const playerNameInput = document.getElementById('playerNameInput');
-        const setPlayerNameButton = document.getElementById('setPlayerNameButton');
-        const notificationArea = document.getElementById('notification-area');
-
-        const moveUpButton = document.getElementById('moveUp');
-        const moveDownButton = document.getElementById('moveDown');
-        const moveLeftButton = document.getElementById('moveLeft');
-        const moveRightButton = document.getElementById('moveRight');
-        const shootButton = document.getElementById('shootButton');
-
-        const PLAYER_SPEED = 3; // IMPORTANT: Must be consistent with how server expects dx/dy
-        const BULLET_SPEED = 10;
-        const PLAYER_RADIUS = 15;
-        const BULLET_RADIUS = 3;
-        const BULLET_LIFETIME = 60; // frames
-        const MUZZLE_FLASH_DURATION = 5; // frames
-        const HIT_MARKER_DURATION = 15; // frames
-        const PLAYER_HIT_FLASH_DURATION = 10; // frames
-        const NOTIFICATION_DISPLAY_TIME = 3000; // ms
-        const INITIAL_MAX_HEALTH_CLIENT = 100; // Client-side reference for initial health / respawn checks
-
-        let defaultPlayerName = localStorage.getItem('playerName') || 'Player_' + Math.floor(Math.random() * 1000);
-        playerNameInput.value = defaultPlayerName;
-
-        let localPlayer = {
-            id: defaultPlayerName,
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-            health: INITIAL_MAX_HEALTH_CLIENT,
-            maxHealth: INITIAL_MAX_HEALTH_CLIENT, // Initialize local player's max health
-            score: 0,
-            lastShotTime: 0,
-            shootCooldown: 200, // ms
-            muzzleFlashTimer: 0,
-            hitFlashTimer: 0
-        };
-
-        let otherPlayers = {}; // Stores other players' states
-        let bullets = []; // Stores bullet states (mostly from server, can predict own)
-        let keys = {}; // Stores state of keyboard keys AND mobile buttons
-
-        let muzzleFlashes = [];
-        let hitMarkers = [];
-        let particles = [];
-
-        class Particle {
-            constructor(x, y, color, size, speedX, speedY, life) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
-                this.size = size;
-                this.speedX = speedX;
-                this.speedY = speedY;
-                this.life = life;
-                this.opacity = 1;
-                this.decay = 1 / life;
-            }
-
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                this.opacity -= this.decay;
-                this.life--;
-                return this.life > 0;
-            }
-
-            draw(ctx) {
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, this.opacity);
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            }
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
         }
 
-        function showNotification(message, type = 'info', duration = NOTIFICATION_DISPLAY_TIME) {
-            const notificationDiv = document.createElement('div');
-            notificationDiv.classList.add('notification', type);
-            notificationDiv.textContent = message;
-            notificationArea.prepend(notificationDiv);
-
-            setTimeout(() => notificationDiv.classList.add('show'), 10);
-
-            setTimeout(() => {
-                notificationDiv.classList.remove('show');
-                notificationDiv.classList.add('hide');
-                notificationDiv.addEventListener('transitionend', () => {
-                    notificationDiv.remove();
-                }, { once: true });
-            }, duration);
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
-        let ws;
-
-        function connectToServer() {
-            const WEBSOCKET_URL = 'wss://game.meho.dpdns.org';
-
-            ws = new WebSocket(WEBSOCKET_URL);
-
-            ws.onopen = () => {
-                console.log('Connected to WebSocket server.');
-                connectionStatusSpan.textContent = 'Connected';
-                connectionStatusSpan.className = 'connected';
-                ws.send(JSON.stringify({ type: 'player_join', player: localPlayer }));
-                showNotification(`Connected! Welcome, ${localPlayer.id}!`, 'success');
-            };
-
-
-            ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                // console.log('Client received:', message); // For debugging
-
-                switch (message.type) {
-                    case 'player_id_confirmed':
-                        const oldId = localPlayer.id;
-                        if (message.id !== localPlayer.id) {
-                            localPlayer.id = message.id; // Update the local player's ID
-                            showNotification(`Your name was updated to: ${localPlayer.id} (was ${oldId})`, 'success');
-                        } else {
-                            showNotification(`Successfully joined as ${localPlayer.id}!`, 'success');
-                        }
-                        // Update player name input if it was a default and got confirmed, or changed by server
-                        if(playerNameInput.value === oldId || oldId.startsWith('Player_')) {
-                            playerNameInput.value = localPlayer.id;
-                            localStorage.setItem('playerName', localPlayer.id);
-                        }
-                        break;
-
-                    case 'game_state_update':
-                        const serverPlayers = message.players || {};
-
-                        // --- Handle Join/Leave Notifications based on current `otherPlayers` vs `serverPlayers` ---
-                        // Identify players who joined (are in serverPlayers but not in current otherPlayers and not localPlayer)
-                        for (const id in serverPlayers) {
-                            if (id !== localPlayer.id && !otherPlayers[id]) {
-                                showNotification(`${serverPlayers[id].id || id} joined the game.`, 'info');
-                            }
-                        }
-                        // Identify players who left (are in current otherPlayers but not in serverPlayers)
-                        for (const id in otherPlayers) {
-                            if (!serverPlayers[id]) {
-                                showNotification(`${otherPlayers[id].id || id} left the game.`, 'warning');
-                            }
-                        }
-
-                        // --- Update Local Player ---
-                        if (serverPlayers[localPlayer.id]) {
-                            const serverLocalData = serverPlayers[localPlayer.id];
-                            localPlayer.x = serverLocalData.x;
-                            localPlayer.y = serverLocalData.y;
-
-                            if (localPlayer.health !== serverLocalData.health) {
-                                if (localPlayer.health > serverLocalData.health) { // Took damage
-                                    localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION; // Already handled by 'player_hit' mostly
-                                    // createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color); // Also by 'player_hit'
-                                }
-                                // Check for respawn (health went from <=0 to new max health)
-                                if (localPlayer.health <=0 && serverLocalData.health === serverLocalData.maxHealth) { 
-                                    showNotification('You respawned!', 'success');
-                                }
-                                localPlayer.health = serverLocalData.health;
-                            }
-                            localPlayer.score = serverLocalData.score;
-                            localPlayer.maxHealth = serverLocalData.maxHealth; // Update local player's max health from server
-                        }
-
-                        // --- Update Other Players ---
-                        const newOtherPlayers = {};
-                        for (const id in serverPlayers) {
-                            if (id !== localPlayer.id) {
-                                newOtherPlayers[id] = { ...serverPlayers[id] }; // Create a new object for the player
-
-                                const prevOtherPlayerState = otherPlayers[id]; // Get previous state if exists
-
-                                // Initialize or carry over _prevHealth. Server health is authoritative.
-                                newOtherPlayers[id]._prevHealth = prevOtherPlayerState ? prevOtherPlayerState.health : newOtherPlayers[id].health;
-                                newOtherPlayers[id].hitFlashTimer = prevOtherPlayerState ? prevOtherPlayerState.hitFlashTimer : 0; // Carry over flash timer
-
-                                // Health change detection for effects (hitFlashTimer is mostly set by 'player_hit')
-                                if (newOtherPlayers[id].health < newOtherPlayers[id]._prevHealth) { // Took damage
-                                    // newOtherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION; // Usually set by 'player_hit'
-                                    // createImpactParticles(newOtherPlayers[id].x, newOtherPlayers[id].y, newOtherPlayers[id].color); // by 'player_hit'
-                                    if (newOtherPlayers[id].health <= 0) {
-                                        // showNotification(`${newOtherPlayers[id].id} was defeated!`, 'error'); // Done by 'player_hit' typically
-                                    } else {
-                                        // showNotification(`${newOtherPlayers[id].id} was hit!`, 'warning', 1500); // by 'player_hit'
-                                    }
-                                }
-                                // Check for respawn for other players
-                                if (newOtherPlayers[id]._prevHealth <=0 && newOtherPlayers[id].health === newOtherPlayers[id].maxHealth) {
-                                    showNotification(`${newOtherPlayers[id].id} respawned!`, 'info');
-                                    newOtherPlayers[id].hitFlashTimer = 0; // Reset flash on respawn
-                                }
-                                // _prevHealth is now current health for next comparison, but this is less critical here
-                                // as game_state_update is authoritative. We mainly use it for "change" detection.
-                            }
-                        }
-                        otherPlayers = newOtherPlayers;
-                        bullets = message.bullets || []; // Bullets state from server
-                        break;
-
-                    case 'player_hit': // Primarily for immediate visual/audio feedback
-                        const targetPlayer = message.id === localPlayer.id ? localPlayer : otherPlayers[message.id];
-                        if (targetPlayer) {
-                            targetPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            // Use hitX, hitY from message for particle origin for accuracy
-                            createImpactParticles(message.hitX || targetPlayer.x, message.hitY || targetPlayer.y, targetPlayer.color);
-
-                            const shooterName = message.shooterId ? (serverPlayers[message.shooterId]?.id || message.shooterId) : 'someone';
-
-                            if (message.id === localPlayer.id) {
-                                if (message.newHealth <= 0 && localPlayer.health > 0) { // Check localPlayer.health to avoid duplicate defeat message
-                                    showNotification(`You were defeated by ${shooterName}!`, 'error');
-                                } else if (localPlayer.health > 0 && message.newHealth < localPlayer.health) {
-                                    showNotification(`You were hit by ${shooterName}!`, 'warning', 1500);
-                                }
-                                // localPlayer.health will be updated by game_state_update
-                            } else {
-                                if (message.newHealth <= 0 && targetPlayer.health > 0) {
-                                    showNotification(`${targetPlayer.id} was defeated by ${shooterName}!`, 'error');
-                                } else if (targetPlayer.health > 0 && message.newHealth < targetPlayer.health) {
-                                    showNotification(`${targetPlayer.id} was hit by ${shooterName}!`, 'warning', 1500);
-                                }
-                                // otherPlayers[message.id].health will be updated by game_state_update
-                            }
-                        }
-                        if (message.hitX && message.hitY) { // Create hit marker effect
-                            hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION }); 
-                        }
-                        break;
-
-                    case 'player_upgraded_health': // Handle health upgrade notification
-                        const upgradedPlayer = message.id === localPlayer.id ? localPlayer : otherPlayers[message.id];
-                        if (upgradedPlayer) {
-                            const playerName = upgradedPlayer.id;
-                            showNotification(`${playerName} achieved ${message.score} score and gained extra health!`, 'success', 4000);
-                            // Ensure the client-side maxHealth is updated immediately for visual consistency
-                            if (message.id === localPlayer.id) {
-                                localPlayer.maxHealth = message.newMaxHealth;
-                            } else if (otherPlayers[message.id]) {
-                                otherPlayers[message.id].maxHealth = message.newMaxHealth;
-                            }
-                        }
-                        break;
-
-                    case 'player_joined': // When *another* player joins, server broadcasts this
-                        if (message.player && message.player.id !== localPlayer.id) {
-                            if (!otherPlayers[message.player.id]) { // Avoid adding if already present (e.g. from game_state_update)
-                                otherPlayers[message.player.id] = { ...message.player };
-                                otherPlayers[message.player.id].hitFlashTimer = 0; // Initialize
-                                // _prevHealth will be set by game_state_update effectively
-                                showNotification(`${message.player.id} joined the game.`, 'info');
-                            }
-                        }
-                        break;
-
-                    case 'player_disconnected':
-                        if (message.id && otherPlayers[message.id]) {
-                            showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
-                            delete otherPlayers[message.id];
-                        }
-                        break;
-                }
-            };
-
-            ws.onclose = (event) => {
-                console.log('Disconnected from WebSocket server. Attempting to reconnect in 3s...', event.reason, event.code);
-                connectionStatusSpan.textContent = 'Disconnected';
-                connectionStatusSpan.className = 'disconnected';
-                showNotification('Disconnected. Reconnecting...', 'error');
-                // Clear other players as their state is now unknown
-                otherPlayers = {};
-                bullets = [];
-                setTimeout(connectToServer, 3000);
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                connectionStatusSpan.textContent = 'Error';
-                connectionStatusSpan.className = 'disconnected';
-                showNotification('WebSocket connection error!', 'error');
-                if (ws && ws.readyState !== WebSocket.CLOSED) {
-                    ws.close(); // Ensure it's closed before attempting reconnect by onclose
-                }
-            };
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
         }
 
-        document.addEventListener('DOMContentLoaded', connectToServer);
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
 
-        function createMuzzleFlash(x, y, color) {
-            muzzleFlashes.push({ x, y, color, timer: MUZZLE_FLASH_DURATION });
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
+
+        /* Mobile Controls */
+        .mobile-controls-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 0; /* Gap handles spacing */
+            padding: 10px 0;
+            flex-shrink: 0; /* Prevent from shrinking */
         }
 
-        function createImpactParticles(x, y, baseColor) {
-            const numParticles = 10 + Math.floor(Math.random() * 5);
-            for (let i = 0; i < numParticles; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 3 + 1;
-                const speedX = Math.cos(angle) * speed;
-                const speedY = Math.sin(angle) * speed;
-                const size = Math.random() * 2 + 1;
-                const life = Math.random() * 30 + 20;
-                let particleColor = baseColor; // Fallback
-                try {
-                    // Attempt to parse hsl or rgb color
-                    if (baseColor.startsWith('hsl')) {
-                        const parts = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-                        if (parts && parts.length === 4) { // Ensure all capture groups are present
-                            // Adjust lightness for particle color to make it brighter/darker
-                            particleColor = `hsla(${parts[1]}, ${parts[2]}%, ${Math.min(100, parseInt(parts[3]) + 20)}%, ${Math.random()*0.5 + 0.5})`;
-                        }
-                    } else if (baseColor.startsWith('rgb')) {
-                         const rgbMatch = baseColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-                         if (rgbMatch && rgbMatch.length === 4) {
-                             const r = parseInt(rgbMatch[1]);
-                             const g = parseInt(rgbMatch[2]);
-                             const b = parseInt(rgbMatch[3]);
-                             particleColor = `rgba(${Math.min(255, r + Math.floor(Math.random()*50))}, ${Math.min(255, g + Math.floor(Math.random()*50))}, ${Math.min(255, b + Math.floor(Math.random()*50))}, ${Math.random()*0.5 + 0.5})`;
-                         }
-                    }
-                } catch(e) { /* use default baseColor */ }
-                particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
-            }
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
         }
 
-        function update() {
-            let dx = 0; // Delta X for this frame's input
-            let dy = 0; // Delta Y for this frame's input
-
-            // Client-side prediction logic
-            if (keys['arrowup'] || keys['w']) {
-                dy -= PLAYER_SPEED;
-            }
-            if (keys['arrowdown'] || keys['s']) {
-                dy += PLAYER_SPEED;
-            }
-            if (keys['arrowleft'] || keys['a']) {
-                dx -= PLAYER_SPEED;
-            }
-            if (keys['arrowright'] || keys['d']) {
-                dx += PLAYER_SPEED;
-            }
-
-            // Normalize diagonal movement (optional but good practice)
-            if (dx !== 0 && dy !== 0) {
-                const length = Math.sqrt(dx * dx + dy * dy);
-                dx = (dx / length) * PLAYER_SPEED;
-                dy = (dy / length) * PLAYER_SPEED;
-            }
-
-            // Apply predicted movement
-            if (dx !== 0 || dy !== 0) {
-                localPlayer.x += dx;
-                localPlayer.y += dy;
-            }
-
-            // Clamp local player position to canvas bounds (visual prediction)
-            localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
-            localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
-
-            // Send movement input to server if character input occurred
-            if (ws && ws.readyState === WebSocket.OPEN && (dx !== 0 || dy !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_input', dx: dx, dy: dy }));
-            }
-
-            // Shooting
-            if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
-                localPlayer.lastShotTime = Date.now();
-                createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
-
-                // For now, shoot straight up. A real game would use mouse direction.
-                let bulletDirX = 0;
-                let bulletDirY = -1;
-                // TODO: Implement aiming (e.g., based on mouse position)
-                // const rect = canvas.getBoundingClientRect();
-                // const mouseClientX = lastMouseX; // You'd need to track mouse position
-                // const mouseClientY = lastMouseY;
-                // const mouseCanvasX = mouseClientX - rect.left;
-                // const mouseCanvasY = mouseClientY - rect.top;
-                // let aimX = mouseCanvasX - localPlayer.x;
-                // let aimY = mouseCanvasY - localPlayer.y;
-                // const len = Math.sqrt(aimX * aimX + aimY * aimY);
-                // if (len > 0) {
-                //     bulletDirX = aimX / len;
-                //     bulletDirY = aimY / len;
-                // }
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', bulletDirX: bulletDirX, bulletDirY: bulletDirY }));
-                }
-            }
-
-            // Client-side bullet prediction is less critical if server sends full bullet states
-            // We can remove client-side bullet movement prediction if server `game_state_update` is frequent enough
-            // For now, `bullets` array is fully replaced by server's `game_state_update`.
-
-            // Update visual effects
-            for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
-                muzzleFlashes[i].timer--;
-                if (muzzleFlashes[i].timer <= 0) {
-                    muzzleFlashes.splice(i, 1);
-                }
-            }
-
-            for (let i = hitMarkers.length - 1; i >= 0; i--) {
-                hitMarkers[i].timer--;
-                if (hitMarkers[i].timer <= 0) {
-                    hitMarkers.splice(i, 1);
-                }
-            }
-
-            for (let i = particles.length - 1; i >= 0; i--) {
-                if (!particles[i].update()) {
-                    particles.splice(i, 1);
-                }
-            }
-
-            if (localPlayer.hitFlashTimer > 0) {
-                localPlayer.hitFlashTimer--;
-            }
-            for (const id in otherPlayers) {
-                if (otherPlayers[id].hitFlashTimer > 0) {
-                    otherPlayers[id].hitFlashTimer--;
-                }
-            }
+        html, body {
+            height: 100%; /* Ensure html and body take full viewport height */
+            margin: 0;
+            padding: 0;
         }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw bullets (received from server)
-            bullets.forEach(bullet => {
-                ctx.beginPath();
-                ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
-                ctx.fillStyle = bullet.color;
-                ctx.fill();
-
-                // Simple trail effect
-                const trailLength = BULLET_SPEED * 1.5;
-                ctx.beginPath();
-                ctx.moveTo(bullet.x, bullet.y);
-                ctx.lineTo(bullet.x - bullet.dirX * trailLength, bullet.y - bullet.dirY * trailLength);
-                ctx.strokeStyle = `rgba(255, 255, 255, 0.3)`;
-                ctx.lineWidth = BULLET_RADIUS;
-                ctx.stroke();
-            });
-
-            // Draw muzzle flashes
-            muzzleFlashes.forEach(flash => {
-                const opacity = flash.timer / MUZZLE_FLASH_DURATION;
-                ctx.save();
-                ctx.globalAlpha = opacity * 0.8;
-                ctx.fillStyle = `rgba(255, 223, 0, ${opacity})`; // Yellowish
-                ctx.beginPath();
-                // Pulsating effect
-                const flashSize = PLAYER_RADIUS * (0.6 + (1 - opacity) * 0.4);
-                ctx.arc(flash.x, flash.y, flashSize, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            });
-
-            // Draw other players
-            for (const id in otherPlayers) {
-                const player = otherPlayers[id];
-                ctx.save();
-                if (player.hitFlashTimer > 0) {
-                    const flashOpacity = (player.hitFlashTimer / PLAYER_HIT_FLASH_DURATION) * 0.7;
-                    ctx.fillStyle = `rgba(255, 0, 0, ${flashOpacity})`; // Red flash
-                    ctx.beginPath();
-                    ctx.arc(player.x, player.y, PLAYER_RADIUS + 3, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                ctx.beginPath();
-                ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
-                ctx.fillStyle = player.color;
-                ctx.fill();
-                ctx.strokeStyle = '#ddd'; // Lighter border for others
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.restore();
-
-                // Health bar
-                ctx.fillStyle = '#555'; // Background
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
-                // Use player.maxHealth for health bar calculation
-                const healthPercentage = Math.max(0, player.health / player.maxHealth);
-                ctx.fillStyle = healthPercentage > 0.3 ? 'limegreen' : 'red';
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * healthPercentage, 6);
-
-                // Name and Score
-                ctx.fillStyle = 'white';
-                ctx.font = '10px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${player.id} (S: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 12);
-            }
-
-            // Draw local player
-            ctx.save();
-            if (localPlayer.hitFlashTimer > 0) {
-                const flashOpacity = (localPlayer.hitFlashTimer / PLAYER_HIT_FLASH_DURATION) * 0.8;
-                ctx.fillStyle = `rgba(255, 100, 100, ${flashOpacity})`; // Lighter red flash for self
-                ctx.beginPath();
-                ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS + 4, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.beginPath();
-            ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = localPlayer.color;
-            ctx.fill();
-            ctx.strokeStyle = 'gold'; // Gold border for local player
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.restore();
-
-            // Local player health bar
-            ctx.fillStyle = '#555';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
-            // Use localPlayer.maxHealth for health bar calculation
-            const localHealthPercentage = Math.max(0, localPlayer.health / localPlayer.maxHealth);
-            ctx.fillStyle = localHealthPercentage > 0.3 ? 'limegreen' : 'red';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * localHealthPercentage, 6);
-
-            // Local player name and score
-            ctx.fillStyle = 'white';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`You: ${localPlayer.id} (Score: ${localPlayer.score})`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
-
-
-            // Draw hit markers
-            hitMarkers.forEach(marker => {
-                const opacity = marker.timer / HIT_MARKER_DURATION;
-                ctx.save();
-                ctx.globalAlpha = opacity;
-                ctx.strokeStyle = `rgba(255, 50, 50, ${opacity * 0.8})`; // Reddish hit marker
-                ctx.lineWidth = 3;
-                const size = 8 + (1 - opacity) * 5; // Marker shrinks
-                ctx.beginPath();
-                ctx.moveTo(marker.x - size / 2, marker.y - size / 2);
-                ctx.lineTo(marker.x + size / 2, marker.y + size / 2);
-                ctx.moveTo(marker.x + size / 2, marker.y - size / 2);
-                ctx.lineTo(marker.x - size / 2, marker.y + size / 2);
-                ctx.stroke();
-                ctx.restore();
-            });
-
-            // Draw particles
-            particles.forEach(p => p.draw(ctx));
+        body {
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center;
+            justify-content: flex-start; /* Align items to the top to allow content flow */
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            padding: 20px; /* Keep padding for overall aesthetic */
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            overflow: hidden; /* Keep hidden for the main body to prevent overall scrollbars */
         }
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-        gameLoop();
-
-        // --- Input Handling (Keyboard) ---
-        window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            keys[key] = true;
-            // Prevent default for game keys to avoid scrolling etc.
-            if (key === ' ' || key.startsWith('arrow') || ['w', 'a', 's', 'd'].includes(key)) {
-                e.preventDefault();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            keys[e.key.toLowerCase()] = false;
-        });
-
-        // --- Mobile/Touch Controls Input Handling ---
-        function addTouchAndMouseListeners(element, keyName) {
-            const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
-            const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
-            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave';
-
-            element.addEventListener(startEvent, (e) => {
-                e.preventDefault();
-                keys[keyName] = true;
-            }, { passive: false });
-
-            element.addEventListener(endEvent, (e) => {
-                e.preventDefault(); // Might not be strictly necessary for end event but good for consistency
-                keys[keyName] = false;
-            });
-
-            element.addEventListener(leaveEvent, (e) => {
-                 if (keys[keyName]) {
-                    keys[keyName] = false;
-                 }
-            });
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            flex-shrink: 0; /* Prevent h1 from shrinking */
         }
 
-        addTouchAndMouseListeners(moveUpButton, 'w'); // Map to 'w' for unified handling
-        addTouchAndMouseListeners(moveDownButton, 's'); // Map to 's'
-        addTouchAndMouseListeners(moveLeftButton, 'a'); // Map to 'a'
-        addTouchAndMouseListeners(moveRightButton, 'd'); // Map to 'd'
-        addTouchAndMouseListeners(shootButton, ' '); // Map to spacebar
-
-        // --- Fullscreen Toggle ---
-        function toggleFullscreen() {
-            if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
-                if (canvas.requestFullscreen) {
-                    canvas.requestFullscreen();
-                } else if (canvas.mozRequestFullScreen) { /* Firefox */
-                    canvas.mozRequestFullScreen();
-                } else if (canvas.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
-                    canvas.webkitRequestFullscreen();
-                } else if (canvas.msRequestFullscreen) { /* IE/Edge */
-                    canvas.msRequestFullscreen();
-                }
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.mozCancelFullScreen) { /* Firefox */
-                    document.mozCancelFullScreen();
-                } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) { /* IE/Edge */
-                    document.msExitFullscreen();
-                }
-            }
+        .ui-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            
+            /* NEW: Make this container scrollable if its content overflows */
+            flex-grow: 1; /* Allow it to grow and take available space */
+            overflow-y: auto; /* Enable vertical scrolling if content overflows */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            padding: 0; /* Let inner elements handle their own padding/margin */
+            box-sizing: border-box;
+            /* Add some padding for the scrollable content itself */
+            padding-bottom: 20px; /* Add space at the bottom when scrolled */
         }
-        fullscreenButton.addEventListener('click', toggleFullscreen);
 
-        function updateFullscreenButtonText() {
-            if (document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 0; /* Removed margin-bottom here as gap handles spacing */
+            border-radius: 8px;
+            flex-shrink: 0; /* Prevent canvas from shrinking on smaller screens */
         }
-        ['fullscreenchange', 'mozfullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(event => {
-            document.addEventListener(event, updateFullscreenButtonText, false);
-        });
 
-        // --- Player Name Logic ---
-        setPlayerNameButton.addEventListener('click', () => {
-            let newName = playerNameInput.value.trim();
-            if (newName.length === 0) {
-                newName = 'Player_' + Math.floor(Math.random() * 1000); // Default if empty
-            }
-            newName = newName.substring(0, 12); // Max length
-            playerNameInput.value = newName; // Update input field with sanitized name
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
 
-            if (localPlayer.id !== newName) {
-                const oldName = localPlayer.id;
-                localPlayer.id = newName; // Tentatively update local id
-                localStorage.setItem('playerName', newName);
-                showNotification(`Name changed to: ${newName}. Reconnecting...`, 'info');
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
 
-                if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-                    ws.onclose = null; // Prevent default reconnect logic briefly
-                    ws.close(1000, "User changed name"); // Clean close
-                    setTimeout(connectToServer, 100); // Reconnect with new name info
-                } else {
-                    connectToServer(); // If not connected, just connect
-                }
-            } else {
-                showNotification(`Name is already ${newName}.`, 'info', 1500);
-            }
-        });
+        .panel p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
 
-        // --- Prevent Page Refresh/Leaving (Optional) ---
-        // window.addEventListener('beforeunload', (event) => {
-        //     event.preventDefault();
-        //     event.returnValue = 'Are you sure you want to leave? Your game progress will be lost.';
-        // });
-    </script>
-</body>
-</html>
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
+
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
+
+        /* Mobile Controls */
+        .mobile-controls-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 0; /* Gap handles spacing */
+            padding: 10px 0;
+            flex-shrink: 0; /* Prevent from shrinking */
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+        }
+
+        html, body {
+            height: 100%; /* Ensure html and body take full viewport height */
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center;
+            justify-content: flex-start; /* Align items to the top to allow content flow */
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            padding: 20px; /* Keep padding for overall aesthetic */
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            overflow: hidden; /* Keep hidden for the main body to prevent overall scrollbars */
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            flex-shrink: 0; /* Prevent h1 from shrinking */
+        }
+
+        .ui-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            
+            /* NEW: Make this container scrollable if its content overflows */
+            flex-grow: 1; /* Allow it to grow and take available space */
+            overflow-y: auto; /* Enable vertical scrolling if content overflows */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            padding: 0; /* Let inner elements handle their own padding/margin */
+            box-sizing: border-box;
+            /* Add some padding for the scrollable content itself */
+            padding-bottom: 20px; /* Add space at the bottom when scrolled */
+        }
+
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 0; /* Removed margin-bottom here as gap handles spacing */
+            border-radius: 8px;
+            flex-shrink: 0; /* Prevent canvas from shrinking on smaller screens */
+        }
+
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .panel p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
+
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
+
+        /* Mobile Controls */
+        .mobile-controls-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 0; /* Gap handles spacing */
+            padding: 10px 0;
+            flex-shrink: 0; /* Prevent from shrinking */
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+        }
+
+        html, body {
+            height: 100%; /* Ensure html and body take full viewport height */
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center;
+            justify-content: flex-start; /* Align items to the top to allow content flow */
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            padding: 20px; /* Keep padding for overall aesthetic */
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            overflow: hidden; /* Keep hidden for the main body to prevent overall scrollbars */
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            flex-shrink: 0; /* Prevent h1 from shrinking */
+        }
+
+        .ui-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            
+            /* NEW: Make this container scrollable if its content overflows */
+            flex-grow: 1; /* Allow it to grow and take available space */
+            overflow-y: auto; /* Enable vertical scrolling if content overflows */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            padding: 0; /* Let inner elements handle their own padding/margin */
+            box-sizing: border-box;
+            /* Add some padding for the scrollable content itself */
+            padding-bottom: 20px; /* Add space at the bottom when scrolled */
+        }
+
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 0; /* Removed margin-bottom here as gap handles spacing */
+            border-radius: 8px;
+            flex-shrink: 0; /* Prevent canvas from shrinking on smaller screens */
+        }
+
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .panel p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
+
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
+
+        /* Mobile Controls */
+        .mobile-controls-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 0; /* Gap handles spacing */
+            padding: 10px 0;
+            flex-shrink: 0; /* Prevent from shrinking */
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+        }
+
+        html, body {
+            height: 100%;
