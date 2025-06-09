@@ -190,7 +190,6 @@
         /* Mobile Controls - Hidden by default, shown by JS */
         .mobile-controls-container {
             display: none; /* Hidden by default */
-            /* NEW: Adjustments for PS5-like grouping */
             justify-content: center; /* Center the two control groups */
             align-items: center; /* Vertically center them */
             gap: 80px; /* Space between D-pad and action buttons */
@@ -205,7 +204,7 @@
             display: grid;
             grid-template-columns: repeat(3, 60px);
             grid-template-rows: repeat(3, 60px);
-            gap: 8px; /* Increased gap */
+            gap: 5px; /* NEW: Reduced gap for tighter cross */
             background-color: var(--light-bg);
             border-radius: 15px; /* More rounded */
             padding: 15px; /* Increased padding */
@@ -235,7 +234,7 @@
         .d-pad button:hover {
             background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
         }
-        .d-pad .center { visibility: hidden; }
+        /* No .d-pad .center anymore */
 
         .action-buttons {
             display: flex;
@@ -249,7 +248,6 @@
             padding: 25px 35px; /* Larger padding */
             border: none;
             border-radius: 50%;
-            /* NEW: Adjust font size for 'X' symbol */
             font-size: 2.5em; /* Larger font for X symbol */
             width: 100px; /* Larger button */
             height: 100px;
@@ -481,12 +479,12 @@
             <div class="d-pad">
                 <button id="moveUp" class="up">↑</button>
                 <button id="moveLeft" class="left">←</button>
-                <div class="center"></div> <!-- Placeholder -->
+                <!-- REMOVED: <div class="center"></div> -->
                 <button id="moveRight" class="right">→</button>
                 <button id="moveDown" class="down">↓</button>
             </div>
             <div class="action-buttons">
-                <button id="shootButton">X</button> <!-- Changed SHOOT to X -->
+                <button id="shootButton">X</button> 
             </div>
         </div>
     
@@ -496,7 +494,7 @@
             <p>A **real multiplayer game** requires a dedicated **server** to manage game logic, player synchronization, and communication between all clients.</p>
             <p class="controls-info"><strong>Controls:</strong>
                 <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen D-Pad**
-                <br>Shoot: <kbd>Spacebar</kbd> / **On-screen <kbd>X</kbd> button** <!-- Updated control hint -->
+                <br>Shoot: <kbd>Spacebar</kbd> / **On-screen <kbd>X</kbd> button**
             </p>
         </div>
     </div>
