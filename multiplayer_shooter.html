@@ -19,13 +19,6 @@
             --accent-color-green: #28a745;
             --border-color: #555;
             --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
-
-            /* Joystick specific colors/sizes */
-            --joystick-base-color: rgba(68, 72, 102, 0.4); /* Transparent light-bg */
-            --joystick-base-border: rgba(255, 255, 255, 0.15); /* Lighter border for base */
-            --joystick-thumb-color: rgba(0, 123, 255, 0.6); /* Semi-transparent primary color for thumb */
-            --joystick-thumb-border: rgba(0, 123, 255, 0.8); /* Stronger border for thumb */
-            --joystick-thumb-active-color: #007bff; /* Active color for thumb */
         }
 
         body {
@@ -194,67 +187,59 @@
         .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
         .notification.error { border-color: var(--accent-color-red); }
 
-        /* Mobile Controls - Hidden by default, shown by JS */
+        /* Mobile Controls Container - Fixed at bottom */
         .mobile-controls-container {
-            display: none; /* Hidden by default */
-            justify-content: center; /* Center the two control groups */
-            align-items: center; /* Vertically center them */
-            gap: 80px; /* Space between joystick and action buttons */
-            
-            width: 100%;
-            max-width: 800px;
-            margin-top: 20px;
-            padding: 10px 0;
+            display: none; /* Controlled by JS */
+            position: fixed; /* Position relative to viewport */
+            bottom: 20px; /* Distance from bottom */
+            width: calc(100% - 40px); /* Full width minus side padding */
+            left: 20px; /* Align to left */
+            justify-content: space-between; /* Push items to ends */
+            align-items: flex-end; /* Align items to the bottom of the container */
+            padding: 0;
+            box-sizing: border-box;
+            z-index: 900; /* Ensure it's above canvas but below modals */
+            pointer-events: none; /* Allow events to pass through, children will re-enable */
+        }
+        .mobile-controls-container > div,
+        .mobile-controls-container > button { /* Re-enable pointer events for actual controls */
+            pointer-events: auto;
         }
 
-        /* NEW: Joystick styling */
-        .joystick-base {
-            --joystick-base-size: 150px; /* Base size for the outer circle */
-            --joystick-thumb-size: 60px; /* Size for the inner thumbstick */
-
+        /* Joystick Styles */
+        #joystick-base {
             position: relative;
-            width: var(--joystick-base-size);
-            height: var(--joystick-base-size);
-            background-color: var(--joystick-base-color);
-            border: 2px solid var(--joystick-base-border);
+            width: 120px; /* Size of the outer circle */
+            height: 120px;
             border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.15); /* Semi-transparent white */
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.4);
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-            -webkit-tap-highlight-color: transparent;
-            touch-action: none; /* Crucial to prevent browser scrolling/zooming */
         }
 
-        .joystick-thumb {
+        #joystick-thumb {
             position: absolute;
-            width: var(--joystick-thumb-size);
-            height: var(--joystick-thumb-size);
-            background-color: var(--joystick-thumb-color);
-            border: 1px solid var(--joystick-thumb-border);
+            width: 60px; /* Size of the inner thumbstick */
+            height: 60px;
             border-radius: 50%;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            background: linear-gradient(180deg, var(--primary-color) 0%, #003f80 100%); /* Darker blue, more solid */
+            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.6);
             cursor: grab;
-            transition: background-color 0.1s ease, transform 0.1s ease, left 0.05s linear, top 0.05s linear; /* Smooth transition for active state and movement */
-            -webkit-tap-highlight-color: transparent;
-            /* Initial centering */
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            touch-action: none; /* Crucial to prevent browser scrolling/zooming */
+            transition: transform 0.1s ease-out; /* Smooth reset to center */
         }
-
-        .joystick-thumb:active {
-            background-color: var(--joystick-thumb-active-color);
+        #joystick-thumb.active {
             cursor: grabbing;
         }
-        /* END NEW JOYSTICK STYLING */
 
         .action-buttons {
             display: flex;
             flex-direction: column;
             gap: 20px; /* Increased gap */
-            margin-right: 0; /* No external margin needed when centered */
+            /* No margin-right needed, space-between handles it */
         }
         .action-buttons button {
             background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
@@ -452,18 +437,7 @@
         @media (max-width: 768px) {
             h1 { font-size: 2em; }
             canvas { width: 100%; height: auto; } /* Allow canvas to scale */
-            .mobile-controls-container { 
-                flex-direction: column; /* Stack controls vertically on small screens */
-                align-items: center; 
-                gap: 30px; /* Smaller gap when stacked */
-            }
-            /* Joystick specific adjustments for smaller screens */
-            .joystick-base {
-                --joystick-base-size: 120px; /* Smaller base on mobile */
-                --joystick-thumb-size: 50px; /* Smaller thumb on mobile */
-            }
-            .action-buttons { margin-right: 0; }
-            .action-buttons button { width: 80px; height: 80px; font-size: 1.8em; padding: 15px; } /* Adjust font size for smaller mobile button */
+            /* Mobile controls container already handles fixed positioning */
             #scoreboard { top: 10px; left: 10px; width: 180px; }
             #notification-area { top: 10px; right: 10px; width: 220px; }
             .panel { padding: 15px; }
@@ -492,12 +466,10 @@
     
         <canvas id="gameCanvas" width="800" height="600"></canvas>
     
-        <!-- Mobile Controls -->
+        <!-- Mobile Controls (Joystick and Shoot Button) -->
         <div class="mobile-controls-container">
-            <div class="joystick-container">
-                <div class="joystick-base" id="joystickBase">
-                    <div class="joystick-thumb" id="joystickThumb"></div>
-                </div>
+            <div id="joystick-base">
+                <div id="joystick-thumb"></div>
             </div>
             <div class="action-buttons">
                 <button id="shootButton">X</button> 
@@ -509,8 +481,8 @@
             <p>This is a **client-side demonstration** of a multiplayer game concept, powered by WebSockets.</p>
             <p>A **real multiplayer game** requires a dedicated **server** to manage game logic, player synchronization, and communication between all clients.</p>
             <p class="controls-info"><strong>Controls:</strong>
-                <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Virtual Joystick</kbd>
-                <br>Shoot: <kbd>Spacebar</kbd> or **On-screen <kbd>X</kbd> button**
+                <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen Joystick**
+                <br>Shoot: <kbd>Spacebar</kbd> / **On-screen <kbd>X</kbd> button**
             </p>
         </div>
     </div>
@@ -554,11 +526,10 @@
         const playerScoresList = document.getElementById('playerScoresList'); 
         const mobileControlsContainer = document.querySelector('.mobile-controls-container'); 
 
-        // NEW: Get references to joystick elements
-        const joystickBase = document.getElementById('joystickBase');
-        const joystickThumb = document.getElementById('joystickThumb');
-
-        const shootButton = document.getElementById('shootButton'); // Keep shoot button reference
+        // Joystick elements
+        const joystickBase = document.getElementById('joystick-base');
+        const joystickThumb = document.getElementById('joystick-thumb');
+        const shootButton = document.getElementById('shootButton');
 
         const PLAYER_SPEED = 3; 
         const BULLET_SPEED = 10;
@@ -589,23 +560,24 @@
             lastShotTime: 0,
             shootCooldown: 200, 
             muzzleFlashTimer: 0,
-            hitFlashTimer: 0,
-            dx: 0, // NEW: Current movement vector from joystick/keyboard
-            dy: 0  // NEW: Current movement vector from joystick/keyboard
+            hitFlashTimer: 0
         };
 
         let otherPlayers = {}; 
+        let keys = {}; // For keyboard input
         let bullets = []; 
-        let keys = {}; // Still used for keyboard input
 
         let muzzleFlashes = [];
         let hitMarkers = [];
         let particles = [];
 
-        // NEW: Joystick state variables
-        let isDraggingJoystick = false;
-        let joystickRect; // To store the bounding client rect of the joystick base
-        let joystickRadius; // Max distance thumb can move from center
+        // Joystick state
+        let joystickActive = false;
+        let joystickCenterX = 0;
+        let joystickCenterY = 0;
+        const joystickMaxRadius = 40; // Max distance thumb can move from center
+        let joystickDx = 0;
+        let joystickDy = 0;
 
         class Particle {
             constructor(x, y, color, size, speedX, speedY, life) {
@@ -873,51 +845,44 @@
         }
 
         function update() {
-            let currentDx = 0; 
-            let currentDy = 0; 
+            let dx = 0; 
+            let dy = 0; 
 
-            // Prioritize joystick input if it's active
-            if (isDraggingJoystick) {
-                currentDx = localPlayer.dx;
-                currentDy = localPlayer.dy;
-            } else { // Fallback to keyboard input
-                if (keys['arrowup'] || keys['w']) { currentDy -= PLAYER_SPEED; }
-                if (keys['arrowdown'] || keys['s']) { currentDy += PLAYER_SPEED; }
-                if (keys['arrowleft'] || keys['a']) { currentDx -= PLAYER_SPEED; }
-                if (keys['arrowright'] || keys['d']) { currentDx += PLAYER_SPEED; }
-
-                if (currentDx !== 0 && currentDy !== 0) {
-                    const length = Math.sqrt(currentDx * currentDx + currentDy * currentDy);
-                    currentDx = (currentDx / length) * PLAYER_SPEED;
-                    currentDy = (currentDy / length) * PLAYER_SPEED;
-                }
+            if (isTouchDevice() && joystickActive) {
+                dx = joystickDx * PLAYER_SPEED;
+                dy = joystickDy * PLAYER_SPEED;
+            } else { // Keyboard input for non-touch or when joystick is not active
+                if (keys['arrowup'] || keys['w']) { dy -= PLAYER_SPEED; }
+                if (keys['arrowdown'] || keys['s']) { dy += PLAYER_SPEED; }
+                if (keys['arrowleft'] || keys['a']) { dx -= PLAYER_SPEED; }
+                if (keys['arrowright'] || keys['d']) { dx += PLAYER_SPEED; }
             }
 
-            if (currentDx !== 0 || currentDy !== 0) {
-                localPlayer.x += currentDx;
-                localPlayer.y += currentDy;
+            if (dx !== 0 && dy !== 0) {
+                const length = Math.sqrt(dx * dx + dy * dy);
+                dx = (dx / length) * PLAYER_SPEED;
+                dy = (dy / length) * PLAYER_SPEED;
+            }
+
+            if (dx !== 0 || dy !== 0) {
+                localPlayer.x += dx;
+                localPlayer.y += dy;
             }
 
             localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
-            // Only send player_input if movement has changed or if it's a joystick input
-            // For keyboard, we send on keydown/keyup. For joystick, we send on move.
-            // This is a simplification; a more robust solution would track last sent dx/dy and only send if different.
-            if (ws && ws.readyState === WebSocket.OPEN && (currentDx !== localPlayer.dx || currentDy !== localPlayer.dy)) {
-                // Update localPlayer.dx/dy to reflect what's being sent
-                localPlayer.dx = currentDx;
-                localPlayer.dy = currentDy;
-                ws.send(JSON.stringify({ type: 'player_input', dx: localPlayer.dx, dy: localPlayer.dy }));
+            if (ws && ws.readyState === WebSocket.OPEN && (dx !== 0 || dy !== 0)) {
+                ws.send(JSON.stringify({ type: 'player_input', dx: dx, dy: dy }));
             }
 
-
+            // Shoot logic for both keyboard and touch
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
                 localPlayer.lastShotTime = Date.now();
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
                 let bulletDirX = 0;
-                let bulletDirY = -1; 
+                let bulletDirY = -1; // Default: shoot upwards (like a top-down shooter)
 
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: 'player_shoot', bulletDirX: bulletDirX, bulletDirY: bulletDirY }));
@@ -1097,134 +1062,112 @@
 
         // --- Input Handling (Keyboard) ---
         window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            // Only update keys if not dragging joystick
-            if (!isDraggingJoystick) {
+            // Only process keyboard if not on a touch device or if joystick is not active
+            if (!isTouchDevice() || !joystickActive) {
+                const key = e.key.toLowerCase();
                 keys[key] = true;
-            }
-            if (key === ' ' || key.startsWith('arrow') || ['w', 'a', 's', 'd'].includes(key)) {
-                e.preventDefault();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            keys[key] = false;
-            // If joystick is not active, and a movement key is released, send zero movement
-            if (!isDraggingJoystick && (key.startsWith('arrow') || ['w', 'a', 's', 'd'].includes(key))) {
-                localPlayer.dx = 0;
-                localPlayer.dy = 0;
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_input', dx: 0, dy: 0 }));
+                if (key === ' ' || key.startsWith('arrow') || ['w', 'a', 's', 'd'].includes(key)) {
+                    e.preventDefault();
                 }
             }
         });
 
+        window.addEventListener('keyup', (e) => {
+            if (!isTouchDevice() || !joystickActive) { // Only process keyboard if not on a touch device or if joystick is not active
+                keys[e.key.toLowerCase()] = false;
+            }
+        });
+
         // --- Joystick Input Handling ---
-        function initializeJoystick() {
-            joystickRect = joystickBase.getBoundingClientRect();
-            // Calculate joystickRadius based on base size and thumb size
-            // Thumb should be able to move from center to edge of base, minus its own radius
-            joystickRadius = (joystickRect.width / 2) - (joystickThumb.offsetWidth / 2);
-        }
+        const getTouchPos = (e) => {
+            const rect = joystickBase.getBoundingClientRect();
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            return {
+                x: clientX - rect.left - rect.width / 2,
+                y: clientY - rect.top - rect.height / 2
+            };
+        };
 
-        function handleJoystickStart(e) {
-            e.preventDefault(); // Prevent scrolling/default touch actions
-            isDraggingJoystick = true;
-            // Recalculate joystickRect on start in case of scroll or dynamic layout changes
-            initializeJoystick(); 
-            handleJoystickMove(e); // Process initial touch/click as a move
-        }
+        const handleJoystickStart = (e) => {
+            if (!isTouchDevice()) return; // Only for touch devices
+            e.preventDefault();
+            joystickActive = true;
+            joystickThumb.classList.add('active'); // Add active class for styling
+            joystickThumb.style.transition = 'none'; // Disable transition during drag
 
-        function handleJoystickMove(e) {
-            if (!isDraggingJoystick) return;
+            const pos = getTouchPos(e);
+            joystickCenterX = pos.x; // Center of the joystick movement relative to base
+            joystickCenterY = pos.y; 
 
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            // Initial thumb position should be where the touch started
+            let x = pos.x;
+            let y = pos.y;
+            const distance = Math.sqrt(x * x + y * y);
+            if (distance > joystickMaxRadius) {
+                const angle = Math.atan2(y, x);
+                x = Math.cos(angle) * joystickMaxRadius;
+                y = Math.sin(angle) * joystickMaxRadius;
+            }
+            joystickThumb.style.transform = `translate(${x}px, ${y}px)`;
 
-            // Calculate position relative to joystick base center
-            const joystickCenterX = joystickRect.left + joystickRect.width / 2;
-            const joystickCenterY = joystickRect.top + joystickRect.height / 2;
+            joystickDx = x / joystickMaxRadius;
+            joystickDy = y / joystickMaxRadius;
+        };
 
-            let deltaX = clientX - joystickCenterX;
-            let deltaY = clientY - joystickCenterY;
+        const handleJoystickMove = (e) => {
+            if (!joystickActive || !isTouchDevice()) return;
+            e.preventDefault();
 
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const pos = getTouchPos(e);
+            let x = pos.x;
+            let y = pos.y;
 
-            // Limit thumb movement within the base
-            if (distance > joystickRadius) {
-                const angle = Math.atan2(deltaY, deltaX);
-                deltaX = Math.cos(angle) * joystickRadius;
-                deltaY = Math.sin(angle) * joystickRadius;
+            const distance = Math.sqrt(x * x + y * y);
+
+            if (distance > joystickMaxRadius) {
+                const angle = Math.atan2(y, x);
+                x = Math.cos(angle) * joystickMaxRadius;
+                y = Math.sin(angle) * joystickMaxRadius;
             }
 
-            // Update thumb position (relative to its own top-left for absolute positioning)
-            joystickThumb.style.left = `${joystickThumb.offsetWidth / 2 + deltaX}px`;
-            joystickThumb.style.top = `${joystickThumb.offsetHeight / 2 + deltaY}px`;
+            joystickThumb.style.transform = `translate(${x}px, ${y}px)`;
+            joystickDx = x / joystickMaxRadius;
+            joystickDy = y / joystickMaxRadius;
+        };
 
-            // Calculate movement direction for player based on normalized vector
-            // Normalize deltaX, deltaY to a -1 to 1 range, then scale by PLAYER_SPEED
-            // Use Math.min(distance, joystickRadius) to ensure full speed at edge
-            const normalizedDistance = Math.min(distance, joystickRadius) / joystickRadius;
-            const angle = Math.atan2(deltaY, deltaX);
+        const handleJoystickEnd = (e) => {
+            if (!joystickActive || !isTouchDevice()) return;
+            joystickActive = false;
+            joystickThumb.classList.remove('active'); // Remove active class
+            joystickThumb.style.transition = 'transform 0.1s ease-out'; // Re-enable transition
+            joystickThumb.style.transform = 'translate(0, 0)'; // Reset thumb to center
+            joystickDx = 0;
+            joystickDy = 0;
+        };
+        
+        // Use consistent event names for touch and mouse
+        const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
+        const moveEvent = 'ontouchmove' in window ? 'touchmove' : 'mousemove';
+        const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
 
-            localPlayer.dx = Math.cos(angle) * normalizedDistance * PLAYER_SPEED;
-            localPlayer.dy = Math.sin(angle) * normalizedDistance * PLAYER_SPEED;
+        joystickBase.addEventListener(startEvent, handleJoystickStart, { passive: false });
+        document.addEventListener(moveEvent, handleJoystickMove, { passive: false });
+        document.addEventListener(endEvent, handleJoystickEnd, { passive: false });
 
-            // Send player input to server continuously while dragging
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'player_input', dx: localPlayer.dx, dy: localPlayer.dy }));
-            }
-        }
+        // Shoot button for touch devices
+        shootButton.addEventListener(startEvent, (e) => {
+            if (!isTouchDevice()) return;
+            e.preventDefault();
+            keys[' '] = true; // Simulate spacebar press
+        }, { passive: false });
 
-        function handleJoystickEnd() {
-            isDraggingJoystick = false;
-            // Reset thumb to center
-            joystickThumb.style.left = '50%';
-            joystickThumb.style.top = '50%';
-            // Stop player movement
-            localPlayer.dx = 0;
-            localPlayer.dy = 0;
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'player_input', dx: 0, dy: 0 }));
-            }
-        }
+        shootButton.addEventListener(endEvent, (e) => {
+            if (!isTouchDevice()) return;
+            e.preventDefault();
+            keys[' '] = false; // Simulate spacebar release
+        });
 
-        // Add event listeners for joystick
-        joystickBase.addEventListener('mousedown', handleJoystickStart);
-        joystickBase.addEventListener('touchstart', handleJoystickStart, { passive: false });
-
-        document.addEventListener('mousemove', handleJoystickMove);
-        document.addEventListener('touchmove', handleJoystickMove, { passive: false });
-
-        document.addEventListener('mouseup', handleJoystickEnd);
-        document.addEventListener('touchend', handleJoystickEnd);
-        document.addEventListener('touchcancel', handleJoystickEnd); // For when touch leaves the screen
-
-        // --- Mobile/Touch Controls Input Handling (Shoot Button remains) ---
-        function addTouchAndMouseListeners(element, keyName) {
-            const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
-            const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
-            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave';
-
-            element.addEventListener(startEvent, (e) => {
-                e.preventDefault();
-                keys[keyName] = true;
-            }, { passive: false });
-
-            element.addEventListener(endEvent, (e) => {
-                e.preventDefault(); 
-                keys[keyName] = false;
-            });
-
-            element.addEventListener(leaveEvent, (e) => {
-                 if (keys[keyName]) {
-                    keys[keyName] = false;
-                 }
-            });
-        }
-        // Only the shoot button uses this now
-        addTouchAndMouseListeners(shootButton, ' '); 
 
         // --- Fullscreen Toggle ---
         function toggleFullscreen() {
@@ -1326,11 +1269,7 @@
             }
         });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            updateMobileControlsVisibility();
-            initializeJoystick(); // Initialize joystick dimensions after elements are rendered
-        });
-        window.addEventListener('resize', initializeJoystick); // Re-initialize on window resize
+        document.addEventListener('DOMContentLoaded', updateMobileControlsVisibility);
 
         // --- Prevent Page Refresh/Leaving (Optional) ---
         // window.addEventListener('beforeunload', (event) => {
