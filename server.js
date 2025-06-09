@@ -1,11 +1,22 @@
-// ... (之前的代码)
+// server.js (The complete and correct version for your game)
+
+const WebSocket = require('ws');
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+    // A simple HTTP response for health checks or if someone tries to browse directly
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Multiplayer Game Server is Running!');
+});
+
+const wss = new WebSocket.Server({ server });
 
 const players = {}; // Stores all connected players' states
 const bullets = {}; // Stores all active bullets' states
 
 // --- Game Settings (Server-side authoritative) ---
 const GAME_TICK_RATE = 1000 / 60; // 60 updates per second
-const PLAYER_SPEED = 3; // IMPORTANT: This must be consistent with client's PLAYER_SPEED conceptually, but server is authoritative
+const PLAYER_SPEED = 3; // IMPORTANT: This must be consistent with client's PLAYER_SPEED
 const BULLET_SPEED = 10;
 const PLAYER_RADIUS = 15;
 const BULLET_RADIUS = 3;
@@ -40,9 +51,7 @@ wss.on('connection', ws => {
                         y: parsedMessage.player.y,
                         color: parsedMessage.player.color,
                         health: MAX_HEALTH, // Always start with full health on server
-                        score: 0,
-                        lastProcessedInputSequence: 0, // 新增: 跟踪最新处理的输入序列号
-                        inputState: { up: false, down: false, left: false, right: false } // 新增: 存储当前输入状态
+                        score: 0
                     };
                     console.log(`Player ${playerId} joined.`);
                     // Send back the confirmed player ID to the client if it was adjusted
@@ -60,12 +69,18 @@ wss.on('connection', ws => {
                 case 'player_input':
                     if (playerId && players[playerId]) {
                         const player = players[playerId];
-                        const inputState = parsedMessage.inputState; // 新增: 接收完整的输入状态
-                        const sequence = parsedMessage.sequence;       // 新增: 接收序列号
+                        const dx = parsedMessage.dx; // Direction X from client
+                        const dy = parsedMessage.dy; // Direction Y from client
 
-                        // 更新玩家的最新处理输入序列号和输入状态
-                        player.lastProcessedInputSequence = sequence;
-                        player.inputState = inputState; // 存储最新输入状态，在游戏循环中处理
+                        // Apply movement on the server based on game rules and PLAYER_SPEED
+                        // Note: This is simplified. In a real game, you'd calculate based on time
+                        // and ensure client inputs don't allow "speed hacks".
+                        player.x += dx;
+                        player.y += dy;
+
+                        // Server-side bounds checking (authoritative)
+                        player.x = Math.max(PLAYER_RADIUS, Math.min(800 - PLAYER_RADIUS, player.x));
+                        player.y = Math.max(PLAYER_RADIUS, Math.min(600 - PLAYER_RADIUS, player.y));
                     }
                     break;
 
@@ -117,28 +132,6 @@ wss.on('connection', ws => {
 
 // --- Server Game Loop ---
 setInterval(() => {
-    // 0. Process Player Movement based on stored inputState (Server Authoritative)
-    for (const playerId in players) {
-        const player = players[playerId];
-        const inputState = player.inputState;
-
-        let dx = 0;
-        let dy = 0;
-
-        if (inputState.up) dy -= PLAYER_SPEED;
-        if (inputState.down) dy += PLAYER_SPEED;
-        if (inputState.left) dx -= PLAYER_SPEED;
-        if (inputState.right) dx += PLAYER_SPEED;
-
-        // Apply movement
-        player.x += dx;
-        player.y += dy;
-
-        // Server-side bounds checking (authoritative)
-        player.x = Math.max(PLAYER_RADIUS, Math.min(800 - PLAYER_RADIUS, player.x));
-        player.y = Math.max(PLAYER_RADIUS, Math.min(600 - PLAYER_RADIUS, player.y));
-    }
-
     // 1. Update bullet positions and check for expiration
     for (const bulletId in bullets) {
         const bullet = bullets[bulletId];
@@ -207,10 +200,9 @@ setInterval(() => {
     }
 
     // 3. Prepare game state for clients
-    // Ensure that for the local player, the lastProcessedInputSequence is included in the player object
     const gameState = {
         type: 'game_state_update',
-        players: players, // Send all players' current authoritative states (including lastProcessedInputSequence)
+        players: players, // Send all players' current authoritative states
         bullets: Object.values(bullets) // Send bullets as an array
     };
 
