@@ -200,25 +200,67 @@
             padding: 10px 0;
         }
 
+        /* NEW: D-pad styling to match the cross image */
         .d-pad {
-            display: grid;
-            grid-template-columns: repeat(3, 60px);
-            grid-template-rows: repeat(3, 60px);
-            gap: 5px; /* NEW: Reduced gap for tighter cross */
-            background-color: var(--light-bg);
-            border-radius: 15px; /* More rounded */
-            padding: 15px; /* Increased padding */
+            position: relative; /* For absolute positioning of children */
+            width: 180px; /* Total width of the cross */
+            height: 180px; /* Total height of the cross */
+            background-color: transparent; /* Actual cross shape handled by pseudo-elements */
+            border-radius: 15px; /* Outer border radius */
             box-shadow: 0 4px 10px rgba(0,0,0,0.4);
             border: 1px solid var(--border-color);
+            overflow: hidden; /* Ensures rounded corners are contained */
         }
+
+        /* Create the vertical and horizontal bars of the cross using pseudo-elements */
+        .d-pad::before,
+        .d-pad::after {
+            content: '';
+            position: absolute;
+            background-color: var(--light-bg); /* The solid color of the cross */
+            border-radius: 10px; /* Match button corner radius */
+            z-index: 0; /* Behind the buttons */
+        }
+
+        .d-pad::before { /* Vertical bar */
+            width: 60px; /* Width of an arm */
+            height: 100%; /* Full height */
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .d-pad::after { /* Horizontal bar */
+            width: 100%; /* Full width */
+            height: 60px; /* Height of an arm */
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+        }
+
+        /* Central circle */
+        .d-pad .center-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px; /* Size of the central circle */
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.2); /* A subtle central circle */
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            z-index: 2; /* Above the buttons */
+            pointer-events: none; /* Allow clicks to pass through to buttons */
+        }
+
         .d-pad button {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            position: absolute; /* Position buttons precisely */
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
             color: white;
-            border: none;
-            border-radius: 10px; /* More rounded */
-            font-size: 1.5em; /* Larger arrows */
+            border: none; /* Remove individual button borders */
+            font-size: 1.5em;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -226,15 +268,36 @@
             transition: background-color 0.1s ease, transform 0.1s ease;
             -webkit-tap-highlight-color: transparent;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 1; /* Above the cross background, below the center circle */
         }
-        .d-pad button:active {
-            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
-            transform: scale(0.9); /* More pronounced press */
+
+        /* Position and round corners of individual buttons to form the cross */
+        .d-pad .up {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 10px 10px 0 0; /* Only top-left and top-right corners rounded */
         }
-        .d-pad button:hover {
-            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        .d-pad .down {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 0 0 10px 10px; /* Only bottom-left and bottom-right corners rounded */
         }
-        /* No .d-pad .center anymore */
+        .d-pad .left {
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            border-radius: 10px 0 0 10px; /* Only top-left and bottom-left corners rounded */
+        }
+        .d-pad .right {
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            border-radius: 0 10px 10px 0; /* Only top-right and bottom-right corners rounded */
+        }
+        /* END NEW D-PAD STYLING */
+
 
         .action-buttons {
             display: flex;
@@ -443,7 +506,13 @@
                 align-items: center; 
                 gap: 30px; /* Smaller gap when stacked */
             }
-            .d-pad { margin-bottom: 0; } /* Remove extra margin when stacked */
+            /* D-pad specific adjustments for smaller screens */
+            .d-pad { width: 150px; height: 150px; } /* Smaller overall D-pad */
+            .d-pad::before { width: 50px; } /* Adjust pseudo-element sizes */
+            .d-pad::after { height: 50px; }
+            .d-pad .center-circle { width: 30px; height: 30px; }
+            .d-pad button { width: 50px; height: 50px; font-size: 1.2em; } /* Smaller buttons */
+
             .action-buttons { margin-right: 0; }
             .action-buttons button { width: 80px; height: 80px; font-size: 1.8em; padding: 15px; } /* Adjust font size for smaller mobile button */
             #scoreboard { top: 10px; left: 10px; width: 180px; }
@@ -479,7 +548,7 @@
             <div class="d-pad">
                 <button id="moveUp" class="up">↑</button>
                 <button id="moveLeft" class="left">←</button>
-                <!-- REMOVED: <div class="center"></div> -->
+                <div class="center-circle"></div> <!-- NEW: Central circle element -->
                 <button id="moveRight" class="right">→</button>
                 <button id="moveDown" class="down">↓</button>
             </div>
@@ -759,7 +828,7 @@
                             }
                         }
                         if (message.hitX && message.hitY) { 
-                            hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION }); 
+                            hitMarkers.push({ x: message.hitX, y: message.y, timer: HIT_MARKER_DURATION }); 
                         }
                         break;
 
