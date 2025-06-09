@@ -5,20 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Multiplayer 2D Shooter</title>
     <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #007bff;
-            --secondary-color: #28a745;
-            --dark-bg: #1a1a2e;
-            --medium-bg: #2e304a;
-            --light-bg: #444866;
-            --text-color: #e0e0e0;
-            --accent-color-gold: #ffd700;
-            --accent-color-red: #dc3545;
-            --accent-color-green: #28a745;
-            --border-color: #555;
-            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+            --primary-color: #008cff; /* Brighter blue */
+            --secondary-color: #32cd32; /* Lime green */
+            --dark-bg: #10101a; /* Even darker background */
+            --medium-bg: #202030; /* Darker grey-blue */
+            --light-bg: #303045; /* Slightly lighter grey-blue for panels */
+            --text-color: #e0e0e0; /* Light grey text */
+            --accent-color-gold: #ffeb3b; /* Vibrant gold */
+            --accent-color-red: #ef5350; /* Softer red */
+            --accent-color-green: #66bb6a; /* Brighter green */
+            --border-color: #505060; /* Soft border color */
+            --modal-bg: rgba(20, 20, 30, 0.95); /* Semi-transparent dark background for modals */
+            --glow-blue: rgba(0, 140, 255, 0.5);
+            --glow-green: rgba(50, 205, 50, 0.5);
         }
 
         body {
@@ -28,7 +30,8 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            /* Enhanced background with radial gradient for more depth */
+            background: radial-gradient(circle at top left, var(--dark-bg) 0%, #08080f 70%);
             color: var(--text-color);
             margin: 0;
             padding: 20px;
@@ -40,46 +43,56 @@
             -ms-user-select: none;
             user-select: none;
             touch-action: manipulation;
+            /* Removed overflow: hidden; from here */
         }
 
-        /* NEW: Body Fullscreen adjustments */
+        /* Body Fullscreen adjustments - only apply overflow: hidden when in fullscreen */
         html:-webkit-full-screen,
         html:-moz-full-screen,
         html:-ms-full-screen,
         html:fullscreen {
             overflow: hidden; /* Prevent scrolling in fullscreen */
+            background: black; /* Solid black background for fullscreen */
         }
 
         h1 {
             font-family: 'Orbitron', sans-serif;
             color: var(--accent-color-gold);
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-            margin-bottom: 20px;
-            font-size: 2.5em;
+            /* More pronounced text shadow for a glowing effect */
+            text-shadow: 0 0 15px var(--accent-color-gold), 0 0 25px rgba(255, 235, 59, 0.7);
+            margin-bottom: 25px; /* Increased margin */
+            font-size: 3em; /* Larger title */
+            letter-spacing: 2px; /* Slightly more spaced out */
         }
 
-        /* REVERTED: Canvas styles back to original */
-        canvas {
-            background-color: var(--medium-bg);
-            border: 3px solid var(--border-color);
-            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
-            display: block;
-            margin-bottom: 20px; /* Keep margin-bottom here */
-            border-radius: 8px;
-        }
-
-        /* Removed fullscreen styles from #game-area-wrapper */
+        /* NEW: Game Area Wrapper for responsive canvas */
         #game-area-wrapper {
-            /* This wrapper is now mostly for consistent sizing/centering, not fullscreen */
-            position: relative; /* Still good for any absolute children if we add them later */
-            width: 800px; /* Original width */
-            height: 600px; /* Original height */
-            display: flex; /* To center canvas if it were smaller */
+            position: relative;
+            width: 100%; /* Fill parent width (ui-container) */
+            max-width: 800px; /* Constrain to original game width */
+            aspect-ratio: 4 / 3; /* Maintain 4:3 aspect ratio (800/600) */
+            background-color: var(--medium-bg); /* Canvas background on wrapper */
+            border: 3px solid var(--border-color); /* Canvas border on wrapper */
+            box-shadow: 0 0 25px rgba(0, 140, 255, 0.4), 0 0 50px rgba(0, 140, 255, 0.2); /* Canvas shadow on wrapper */
+            border-radius: 12px; /* Canvas border-radius on wrapper */
+            margin-bottom: 25px; /* Keep margin here for spacing below game */
+            display: flex; /* To center canvas if needed, though canvas will fill it */
             justify-content: center;
             align-items: center;
             overflow: hidden; /* Hide anything that goes outside */
-            /* Removed border, shadow, background, radius from here */
-            /* Removed margin-bottom from here, it's back on canvas */
+        }
+
+        /* Canvas will fill its responsive parent */
+        canvas {
+            width: 100%; /* Fill the wrapper's width */
+            height: 100%; /* Fill the wrapper's height */
+            display: block;
+            /* Remove styles that are now on #game-area-wrapper */
+            background-color: transparent;
+            border: none;
+            box-shadow: none;
+            margin-bottom: 0;
+            border-radius: 0;
         }
 
         /* Canvas scaling when the *HTML* element is fullscreen */
@@ -87,15 +100,19 @@
         html:-webkit-full-screen #gameCanvas,
         html:-moz-full-screen #gameCanvas,
         html:-ms-full-screen #gameCanvas {
-            max-width: 100vw; /* Max width of viewport */
-            max-height: 100vh; /* Max height of viewport */
-            width: auto;
-            height: auto;
-            object-fit: contain; /* Maintain aspect ratio */
+            max-width: 100vw;
+            max-height: 100vh;
+            width: auto; /* Allow object-fit to control width */
+            height: auto; /* Allow object-fit to control height */
+            object-fit: contain; /* Maintain aspect ratio and fit within screen */
             margin: auto; /* Center it in fullscreen */
             position: absolute; /* Position relative to fullscreen body */
             top: 0; bottom: 0; left: 0; right: 0;
             background-color: var(--medium-bg); /* Ensure background is still there */
+            /* In fullscreen, wrapper's visual styles are removed, so canvas needs its own here if desired */
+            border: none;
+            box-shadow: none;
+            border-radius: 0;
         }
 
 
@@ -103,16 +120,17 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
+            gap: 20px; /* Increased gap */
             width: 100%;
             max-width: 800px;
         }
 
         .panel {
             background-color: var(--light-bg);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            padding: 25px; /* Increased padding */
+            border-radius: 12px; /* More rounded */
+            /* Enhanced shadow for depth */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4), inset 0 0 5px rgba(255, 255, 255, 0.05);
             text-align: center;
             width: 100%;
             box-sizing: border-box;
@@ -123,103 +141,120 @@
             font-family: 'Orbitron', sans-serif;
             margin-top: 0;
             color: var(--primary-color);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 10px;
-            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* Slightly stronger separator */
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+            font-size: 1.8em; /* Larger panel titles */
         }
 
         .panel p {
-            margin-bottom: 10px;
-            line-height: 1.5;
+            margin-bottom: 12px; /* Adjusted margin */
+            line-height: 1.6; /* Improved readability */
+            font-size: 1.05em; /* Slightly larger text */
         }
 
         .panel kbd {
-            background-color: #555;
-            padding: 3px 6px;
-            border-radius: 4px;
-            font-family: monospace;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-            border: 1px solid #777;
+            background-color: #444; /* Darker kbd background */
+            padding: 4px 8px; /* Larger padding */
+            border-radius: 5px; /* More rounded */
+            font-family: 'Share Tech Mono', monospace; /* More techy font for kbd */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            border: 1px solid #666;
+            color: #eee; /* Lighter kbd text */
         }
 
         /* Buttons & Inputs */
         button {
             font-family: 'Orbitron', sans-serif;
-            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            /* Richer gradient for primary buttons */
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0066cc 100%);
             color: white;
-            padding: 12px 25px;
+            padding: 14px 30px; /* More generous padding */
             border: none;
-            border-radius: 6px;
+            border-radius: 8px; /* More rounded */
             cursor: pointer;
-            font-size: 1em;
+            font-size: 1.05em; /* Slightly larger font */
             vertical-align: middle;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            transition: all 0.2s ease-in-out;
+            /* Enhanced shadow for depth and glow */
+            box-shadow: 0 5px 15px rgba(0, 140, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            transition: all 0.25s ease-in-out; /* Smoother transition */
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px; /* More spaced out */
             -webkit-tap-highlight-color: transparent;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Text shadow for buttons */
         }
 
         button:hover {
-            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+            background: linear-gradient(180deg, #0066cc 0%, #004d99 100%);
+            transform: translateY(-3px); /* More pronounced lift */
+            box-shadow: 0 8px 20px rgba(0, 140, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
         button:active {
             transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 3px rgba(0, 0, 0, 0.3);
         }
 
         input[type="text"], input[type="color"] {
-            background-color: #555;
+            background-color: #404055; /* Darker input background */
             color: var(--text-color);
             border: 1px solid var(--border-color);
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-size: 1em;
+            padding: 12px 18px; /* More padding */
+            border-radius: 8px; /* More rounded */
+            font-size: 1.05em; /* Slightly larger font */
             text-align: center;
             width: 180px;
             box-sizing: border-box;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type="text"]:focus, input[type="color"]:focus {
+            border-color: var(--primary-color);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 8px rgba(0, 140, 255, 0.6);
+            outline: none;
         }
         input[type="color"] {
             width: 50px;
-            height: 35px;
+            height: 40px; /* Slightly taller */
             padding: 0;
-            border: none;
+            border: 2px solid var(--border-color); /* Thicker border for color picker */
             cursor: pointer;
             vertical-align: middle;
+            border-radius: 6px;
         }
 
         /* NEW: Slider specific styles */
         input[type="range"] {
             -webkit-appearance: none;
-            width: 150px;
-            height: 8px;
-            background: #d3d3d3;
+            width: 180px; /* Wider slider */
+            height: 10px; /* Thicker track */
+            background: #505065; /* Darker track */
             outline: none;
-            opacity: 0.7;
+            opacity: 0.9;
             -webkit-transition: .2s;
             transition: opacity .2s;
             border-radius: 5px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
         }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 20px;
-            height: 20px;
+            width: 24px; /* Larger thumb */
+            height: 24px;
             border-radius: 50%;
-            background: var(--primary-color);
+            background: var(--accent-color-gold); /* Gold thumb */
             cursor: pointer;
-            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+            box-shadow: 0 0 8px var(--accent-color-gold), 0 0 15px rgba(255, 235, 59, 0.5); /* Glowing thumb */
+            border: 2px solid white;
         }
         input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            background: var(--primary-color);
+            background: var(--accent-color-gold);
             cursor: pointer;
-            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+            box-shadow: 0 0 8px var(--accent-color-gold), 0 0 15px rgba(255, 235, 59, 0.5);
+            border: 2px solid white;
         }
 
 
@@ -230,27 +265,28 @@
         /* Notification Area */
         #notification-area {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 280px; /* Slightly wider */
-            max-height: 80vh;
+            top: 25px; /* Slightly more space from top */
+            right: 25px; /* Slightly more space from right */
+            width: 300px; /* Wider notifications */
+            max-height: 85vh; /* More height */
             overflow-y: auto;
             pointer-events: none;
             z-index: 1000;
         }
         .notification {
-            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            background-color: rgba(0, 0, 0, 0.85); /* Darker, more transparent */
             color: white;
-            padding: 12px 18px;
-            border-radius: 8px;
-            margin-bottom: 12px;
+            padding: 15px 20px; /* More padding */
+            border-radius: 10px; /* More rounded */
+            margin-bottom: 15px; /* More space between notifications */
             opacity: 0;
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
             transform: translateX(100%);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            /* Enhanced shadow for notifications */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5), inset 0 0 3px rgba(255, 255, 255, 0.05);
             pointer-events: auto;
-            font-size: 0.95em;
-            border-left: 5px solid; /* For colored border */
+            font-size: 1em; /* Standard font size */
+            border-left: 6px solid; /* Thicker colored border */
         }
         .notification.show { opacity: 1; transform: translateX(0); }
         .notification.hide { opacity: 0; transform: translateX(100%); }
@@ -282,12 +318,16 @@
         #joystick-base {
             position: absolute; /* Relative to mobile-controls-container */
             /* Initial left/bottom will be set by JS */
-            width: 120px; /* Size of the outer circle */
-            height: 120px;
+            width: 130px; /* Slightly larger base */
+            height: 130px;
             border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.15); /* Semi-transparent white */
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 0 15px rgba(0, 123, 255, 0.4);
+            /* More complex background for frosted glass effect */
+            background-color: rgba(255, 255, 255, 0.08); /* More transparent */
+            backdrop-filter: blur(8px); /* Frosted glass effect */
+            -webkit-backdrop-filter: blur(8px); /* For Safari */
+            border: 2px solid rgba(255, 255, 255, 0.2); /* Softer border */
+            /* Subtle inner and outer shadow for depth */
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.05), 0 0 20px var(--glow-blue);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -295,44 +335,53 @@
 
         #joystick-thumb {
             position: absolute; /* Relative to joystick-base */
-            width: 60px; /* Size of the inner thumbstick */
-            height: 60px;
+            width: 65px; /* Slightly larger thumb */
+            height: 65px;
             border-radius: 50%;
-            background: linear-gradient(180deg, var(--primary-color) 0%, #003f80 100%); /* Darker blue, more solid */
-            border: 2px solid white;
-            box-shadow: 0 0 10px rgba(0, 123, 255, 0.6);
+            /* Richer gradient for thumb */
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            border: 3px solid rgba(255, 255, 255, 0.8); /* Stronger white border */
+            /* More prominent shadow and glow */
+            box-shadow: 0 0 15px var(--primary-color), 0 0 25px var(--glow-blue);
             cursor: grab;
-            transition: transform 0.1s ease-out; /* Smooth reset to center */
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease; /* Smooth transition */
         }
         #joystick-thumb.active {
             cursor: grabbing;
+            box-shadow: 0 0 20px var(--primary-color), 0 0 35px var(--glow-blue); /* Stronger glow when active */
         }
 
         #shootButton { /* Direct child of mobile-controls-container */
             position: absolute; /* Relative to mobile-controls-container */
             /* Initial right/bottom will be set by JS */
-            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            /* Richer gradient for shoot button */
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #228b22 100%); /* Forest green */
             color: white;
-            padding: 25px 35px; /* Larger padding */
+            padding: 28px 38px; /* More padding */
             border: none;
             border-radius: 50%;
-            font-size: 2.5em; /* Larger font for X symbol */
-            width: 100px; /* Larger button */
-            height: 100px;
+            font-size: 2.8em; /* Larger X symbol */
+            width: 110px; /* Larger button */
+            height: 110px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
-            transition: background-color 0.1s ease, transform 0.1s ease;
+            /* Enhanced shadow and glow */
+            box-shadow: 0 8px 20px rgba(50, 205, 50, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            transition: all 0.25s ease-in-out;
             -webkit-tap-highlight-color: transparent;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6); /* Text shadow for X */
         }
         #shootButton:active {
-            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
-            transform: scale(0.9);
+            background: linear-gradient(180deg, #228b22 0%, #1a6b1a 100%);
+            transform: scale(0.92); /* Slightly less aggressive scale */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 1px 3px rgba(0, 0, 0, 0.3);
         }
         #shootButton:hover {
-            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+            background: linear-gradient(180deg, #228b22 0%, #1a6b1a 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(50, 205, 50, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
         /* Modal / Settings Panel */
@@ -345,104 +394,118 @@
             width: 100%; /* Full width */
             height: 100%; /* Full height */
             overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.7); /* Black w/ opacity */
+            background-color: rgba(0,0,0,0.7); /* Darker overlay */
             justify-content: center;
             align-items: center;
-            backdrop-filter: blur(5px); /* Frosted glass effect */
+            backdrop-filter: blur(10px); /* Stronger frosted glass effect */
+            -webkit-backdrop-filter: blur(10px); /* For Safari */
         }
 
         .modal-content {
             background-color: var(--modal-bg);
             margin: auto;
-            padding: 30px;
+            padding: 35px; /* More padding */
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            width: 80%;
-            max-width: 500px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
-            animation: fadeIn 0.3s ease-out;
-            position: relative; /* For close button positioning */
+            border-radius: 15px; /* More rounded */
+            width: 85%; /* Slightly wider */
+            max-width: 550px; /* Increased max width */
+            /* More prominent shadow */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6), inset 0 0 8px rgba(255,255,255,0.08);
+            animation: fadeIn 0.4s ease-out; /* Slightly longer fade in */
+            position: relative;
             text-align: center;
         }
 
         .modal-content h3 {
             font-family: 'Orbitron', sans-serif;
             color: var(--accent-color-gold);
+            text-shadow: 0 0 8px rgba(255, 235, 59, 0.5); /* Subtle glow */
             margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 1.8em;
+            margin-bottom: 30px; /* More space */
+            font-size: 2em; /* Larger heading */
+            letter-spacing: 1px;
         }
 
         .modal-content label {
             display: block;
-            margin-bottom: 10px;
-            font-size: 1.1em;
+            margin-bottom: 8px; /* Adjusted margin */
+            font-size: 1.15em; /* Larger label font */
             color: var(--text-color);
+            font-weight: 300; /* Lighter font weight for labels */
         }
 
         .modal-content .setting-row {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: 20px; /* Increased gap */
+            margin-bottom: 25px; /* More space between rows */
             flex-wrap: wrap; /* Allow wrapping on small screens */
         }
         .modal-content .setting-row label {
-            margin-bottom: 0; /* Adjust for inline layout */
+            margin-bottom: 0;
+            flex-basis: 120px; /* Give labels a fixed width */
+            text-align: right;
+        }
+        .modal-content .setting-row input {
+            flex-grow: 1; /* Inputs can grow */
+            max-width: 200px; /* Max width for inputs */
         }
 
         .modal-content button {
-            margin-top: 15px;
-            width: auto; /* Allow button to size naturally */
+            margin-top: 20px; /* More space above buttons */
+            width: auto;
         }
 
         .close-button {
-            color: #aaa;
+            color: #ccc; /* Lighter close button */
             position: absolute;
-            top: 15px;
-            right: 25px;
-            font-size: 30px;
+            top: 20px; /* More space */
+            right: 30px; /* More space */
+            font-size: 35px; /* Larger close button */
             font-weight: bold;
             cursor: pointer;
-            transition: color 0.2s ease;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
 
         .close-button:hover,
         .close-button:focus {
             color: var(--accent-color-red);
+            transform: scale(1.1); /* Slight scale on hover */
             text-decoration: none;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
+            from { opacity: 0; transform: translateY(-30px); } /* More pronounced animation */
             to { opacity: 1; transform: translateY(0); }
         }
 
         /* Scoreboard */
         #scoreboard {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            background-color: rgba(46, 48, 74, 0.85); /* Semi-transparent */
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            top: 25px; /* Consistent spacing with notifications */
+            left: 25px;
+            background-color: rgba(20, 20, 30, 0.85); /* Darker, more opaque */
+            padding: 20px; /* More padding */
+            border-radius: 10px;
+            /* Enhanced shadow */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4), inset 0 0 5px rgba(255,255,255,0.05);
             border: 1px solid var(--border-color);
-            max-height: 70vh;
+            max-height: 75vh; /* Increased max height */
             overflow-y: auto;
-            width: 200px;
+            width: 220px; /* Wider scoreboard */
             text-align: left;
         }
         #scoreboard h3 {
             font-family: 'Orbitron', sans-serif;
             color: var(--accent-color-gold);
+            text-shadow: 0 0 5px rgba(255, 235, 59, 0.3);
             margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 1.2em;
+            margin-bottom: 15px; /* More space */
+            font-size: 1.3em; /* Slightly larger title */
             text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* Stronger separator */
+            padding-bottom: 10px;
         }
         #scoreboard ul {
             list-style: none;
@@ -450,18 +513,22 @@
             margin: 0;
         }
         #scoreboard li {
-            padding: 6px 0;
+            padding: 8px 0; /* More padding */
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.9em;
-            border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+            font-size: 0.95em; /* Slightly larger text */
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.08); /* Softer dashed line */
+            transition: background-color 0.2s ease;
+        }
+        #scoreboard li:hover {
+            background-color: rgba(255, 255, 255, 0.05); /* Subtle hover effect */
         }
         #scoreboard li:last-child {
             border-bottom: none;
         }
         #scoreboard .player-name {
-            font-weight: bold;
+            font-weight: 700; /* Bolder name */
             color: var(--text-color);
             white-space: nowrap;
             overflow: hidden;
@@ -469,7 +536,10 @@
             max-width: 65%; /* Limit name width */
         }
         #scoreboard .player-score {
+            font-family: 'Orbitron', sans-serif; /* Score in Orbitron */
             color: var(--accent-color-gold);
+            text-shadow: 0 0 5px rgba(255, 235, 59, 0.3);
+            font-size: 1.1em; /* Slightly larger score */
         }
         #scoreboard li.local-player .player-name {
             color: var(--accent-color-gold); /* Highlight local player */
@@ -478,23 +548,25 @@
         /* General layout adjustments */
         .game-controls {
             display: flex;
-            gap: 15px;
+            gap: 20px; /* More space */
             justify-content: center;
-            margin-bottom: 15px;
+            margin-bottom: 20px; /* More space */
         }
         .game-controls button {
-            width: 180px; /* Consistent width */
+            width: 200px; /* Wider buttons */
         }
 
         .info-panel {
-            margin-top: 20px;
+            margin-top: 25px; /* More space */
             text-align: left;
             width: 100%;
         }
         .info-panel .status-line {
             text-align: center;
-            margin-bottom: 10px;
-            font-size: 1.1em;
+            margin-bottom: 15px; /* More space */
+            font-size: 1.2em; /* Larger status text */
+            font-family: 'Orbitron', sans-serif;
+            color: var(--primary-color);
         }
 
         /* Hide elements if JS is disabled */
@@ -508,23 +580,45 @@
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
-            h1 { font-size: 2em; }
-            /* #game-area-wrapper will handle canvas scaling */
-            #scoreboard { top: 10px; left: 10px; width: 180px; }
-            #notification-area { top: 10px; right: 10px; width: 220px; }
-            .panel { padding: 15px; }
-            .modal-content { width: 95%; padding: 20px; }
-            .modal-content h3 { font-size: 1.5em; }
-            .modal-content .setting-row { flex-direction: column; gap: 10px; }
-            /* Mobile controls container height can be adjusted for smaller screens */
-            .mobile-controls-container {
-                /* On smaller screens, allow more vertical space */
-                height: 100%; /* Or a percentage like 70% to allow space for other UI */
-            }
-            /* Joystick and shoot button sizes can also be responsive if needed */
-            #joystick-base { width: 100px; height: 100px; }
+            body { padding: 10px; } /* Less overall padding on small screens */
+            h1 { font-size: 2.2em; margin-bottom: 15px; }
+            /* #game-area-wrapper and canvas handled by new responsive rules */
+            .ui-container { gap: 10px; }
+            .panel { padding: 15px; border-radius: 8px; }
+            .panel h2 { font-size: 1.5em; margin-bottom: 15px; }
+            .panel p { font-size: 0.95em; }
+            button { padding: 10px 20px; font-size: 0.95em; border-radius: 6px; }
+            input[type="text"], input[type="color"] { padding: 8px 12px; font-size: 0.95em; border-radius: 6px; }
+            input[type="range"] { width: 120px; height: 6px; } /* Smaller sliders */
+            input[type="range"]::-webkit-slider-thumb,
+            input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; }
+
+            #notification-area { top: 10px; right: 10px; width: 200px; padding: 10px 15px; font-size: 0.85em; border-radius: 8px; }
+            .notification { margin-bottom: 10px; }
+
+            #joystick-base { width: 100px; height: 100px; } /* Smaller joystick */
             #joystick-thumb { width: 50px; height: 50px; }
-            #shootButton { width: 80px; height: 80px; font-size: 1.8em; }
+            #shootButton { width: 90px; height: 90px; font-size: 2.2em; padding: 20px; } /* Smaller shoot button */
+
+            .mobile-controls-container {
+                /* Adjust positioning to be closer to edges on small screens */
+                bottom: 10px;
+                left: 10px;
+                width: calc(100% - 20px);
+                height: calc(100% - 20px); /* Still full height for flexible positioning */
+            }
+
+            #scoreboard { top: 10px; left: 10px; width: 160px; padding: 15px; font-size: 0.85em; border-radius: 8px; }
+            #scoreboard h3 { font-size: 1.1em; margin-bottom: 10px; }
+            #scoreboard li { padding: 5px 0; font-size: 0.8em; }
+
+            .modal-content { width: 95%; padding: 20px; border-radius: 10px; }
+            .modal-content h3 { font-size: 1.6em; margin-bottom: 20px; }
+            .modal-content label { font-size: 1em; }
+            .modal-content .setting-row { flex-direction: column; gap: 10px; margin-bottom: 15px; }
+            .modal-content .setting-row label { text-align: center; flex-basis: auto; }
+            .modal-content .setting-row input { max-width: 100%; }
+            .close-button { top: 10px; right: 15px; font-size: 30px; }
         }
     </style>
 </head>
@@ -545,7 +639,7 @@
             <button id="fullscreenButton">Toggle Fullscreen</button>
         </div>
     
-        <!-- Game Canvas Area - kept for consistent sizing/centering and aspect ratio -->
+        <!-- Game Canvas Area - now responsive -->
         <div id="game-area-wrapper">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
@@ -591,32 +685,32 @@
             <!-- NEW: Joystick Position Settings -->
             <h3>Touch Controls Position</h3>
             <div class="setting-row">
-                <label for="joystickX">Joystick X:</label>
+                <label for="joystickX">Joystick X (from Left):</label>
                 <input type="range" id="joystickX" min="0" max="300" value="20">
-                <span id="joystickXValue">20</span>
+                <span id="joystickXValue">20</span>px
             </div>
             <div class="setting-row">
-                <label for="joystickY">Joystick Y:</label>
+                <label for="joystickY">Joystick Y (from Bottom):</label>
                 <input type="range" id="joystickY" min="0" max="300" value="20">
-                <span id="joystickYValue">20</span>
+                <span id="joystickYValue">20</span>px
             </div>
 
             <!-- NEW: Shoot Button Position Settings -->
             <div class="setting-row">
-                <label for="shootButtonX">Shoot Btn X:</label>
+                <label for="shootButtonX">Shoot Btn X (from Right):</label>
                 <input type="range" id="shootButtonX" min="0" max="300" value="20">
-                <span id="shootButtonXValue">20</span>
+                <span id="shootButtonXValue">20</span>px
             </div>
             <div class="setting-row">
-                <label for="shootButtonY">Shoot Btn Y:</label>
+                <label for="shootButtonY">Shoot Btn Y (from Bottom):</label>
                 <input type="range" id="shootButtonY" min="0" max="300" value="20">
-                <span id="shootButtonYValue">20</span>
+                <span id="shootButtonYValue">20</span>px
             </div>
 
             <button id="saveControlPositionsButton">Save Control Positions</button>
             <button id="resetControlPositionsButton">Reset Control Defaults</button>
 
-            <p style="font-size: 0.9em; color: #aaa;">More settings coming soon!</p>
+            <p style="font-size: 0.9em; color: #aaa; margin-top: 25px;">More settings coming soon!</p>
         </div>
     </div>
 
@@ -707,8 +801,8 @@
 
         // NEW: Default and current control position settings
         const DEFAULT_CONTROL_POSITIONS = {
-            joystick: { x: 20, y: 20 }, // Offset from left, bottom
-            shootButton: { x: 20, y: 20 } // Offset from right, bottom
+            joystick: { x: 40, y: 40 }, // Offset from left, bottom (adjusted for larger joystick)
+            shootButton: { x: 40, y: 40 } // Offset from right, bottom (adjusted for larger button)
         };
         let currentControlPositions = JSON.parse(localStorage.getItem('controlPositions')) || DEFAULT_CONTROL_POSITIONS;
 
@@ -888,7 +982,7 @@
                             }
                         }
                         if (message.hitX && message.hitY) { 
-                            hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION }); 
+                            hitMarkers.push({ x: message.hitX, y: message.y, timer: HIT_MARKER_DURATION }); 
                         }
                         break;
 
