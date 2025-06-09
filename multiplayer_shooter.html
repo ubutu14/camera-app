@@ -211,13 +211,6 @@
         .action-buttons button:hover {
             background-color: #218838;
         }
-
-        /* Optional: Hide mobile controls on larger screens if you only want keyboard for desktop */
-        /* @media (min-width: 768px) {
-            .mobile-controls-container {
-                display: none;
-            }
-        } */
     </style>
 </head>
 <body>
@@ -260,9 +253,6 @@
             <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen D-Pad**
             <br>Shoot: <kbd>Spacebar</kbd> / **On-screen SHOOT button**
         </p>
-        <p>Go back to <a href="index.html">Photo Booth</a></p>
-        <p>Go to <a href="record.html">Video and Audio Recorder</a></p>
-        <p>Go to <a href="ip_check.html">IP Status Information</a></p>
     </div>
 
     <script>
@@ -274,14 +264,13 @@
         const setPlayerNameButton = document.getElementById('setPlayerNameButton');
         const notificationArea = document.getElementById('notification-area');
 
-        // Mobile control buttons (New)
         const moveUpButton = document.getElementById('moveUp');
         const moveDownButton = document.getElementById('moveDown');
         const moveLeftButton = document.getElementById('moveLeft');
         const moveRightButton = document.getElementById('moveRight');
         const shootButton = document.getElementById('shootButton');
 
-        const PLAYER_SPEED = 3;
+        const PLAYER_SPEED = 3; // IMPORTANT: Must be consistent with how server expects dx/dy
         const BULLET_SPEED = 10;
         const PLAYER_RADIUS = 15;
         const BULLET_RADIUS = 3;
@@ -290,6 +279,7 @@
         const HIT_MARKER_DURATION = 15; // frames
         const PLAYER_HIT_FLASH_DURATION = 10; // frames
         const NOTIFICATION_DISPLAY_TIME = 3000; // ms
+        const MAX_HEALTH_CLIENT = 100; // Client-side reference for respawn checks
 
         let defaultPlayerName = localStorage.getItem('playerName') || 'Player_' + Math.floor(Math.random() * 1000);
         playerNameInput.value = defaultPlayerName;
@@ -299,16 +289,16 @@
             x: canvas.width / 2,
             y: canvas.height / 2,
             color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-            health: 100,
+            health: MAX_HEALTH_CLIENT,
             score: 0,
             lastShotTime: 0,
-            shootCooldown: 200,
+            shootCooldown: 200, // ms
             muzzleFlashTimer: 0,
             hitFlashTimer: 0
         };
 
-        let otherPlayers = {};
-        let bullets = [];
+        let otherPlayers = {}; // Stores other players' states
+        let bullets = []; // Stores bullet states (mostly from server, can predict own)
         let keys = {}; // Stores state of keyboard keys AND mobile buttons
 
         let muzzleFlashes = [];
@@ -379,110 +369,157 @@
                 showNotification(`Connected! Welcome, ${localPlayer.id}!`, 'success');
             };
 
+
             ws.onmessage = (event) => {
                 const message = JSON.parse(event.data);
+                // console.log('Client received:', message); // For debugging
 
                 switch (message.type) {
-                    case 'game_state_update':
-                        const currentPlayersIds = Object.keys(otherPlayers);
-                        const newPlayersIds = Object.keys(message.players || {});
-
-                        for (const newId of newPlayersIds) {
-                            if (newId !== localPlayer.id && !currentPlayersIds.includes(newId) && message.players[newId]) {
-                                showNotification(`${message.players[newId].id} joined the game.`, 'info');
-                                message.players[newId]._prevHealth = message.players[newId].health;
-                            }
+                    case 'player_id_confirmed':
+                        const oldId = localPlayer.id;
+                        if (message.id !== localPlayer.id) {
+                            localPlayer.id = message.id; // Update the local player's ID
+                            showNotification(`Your name was updated to: ${localPlayer.id} (was ${oldId})`, 'success');
+                        } else {
+                            showNotification(`Successfully joined as ${localPlayer.id}!`, 'success');
                         }
-
-                        for (const oldId of currentPlayersIds) {
-                            if (oldId !== localPlayer.id && !newPlayersIds.includes(oldId)) {
-                                showNotification(`${otherPlayers[oldId].id} left the game.`, 'warning');
-                            }
-                        }
-
-                        otherPlayers = message.players || {};
-                        bullets = message.bullets || [];
-
-                        // IMPORTANT: For localPlayer, update its position directly from server
-                        // This is the "server authoritative" update that corrects client-side prediction
-                        if (otherPlayers[localPlayer.id]) {
-                            localPlayer.x = otherPlayers[localPlayer.id].x;
-                            localPlayer.y = otherPlayers[localPlayer.id].y;
-                            if (localPlayer.health !== otherPlayers[localPlayer.id].health) {
-                                if (localPlayer.health > otherPlayers[localPlayer.id].health) {
-                                    localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                    createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
-                                }
-                                localPlayer.health = otherPlayers[localPlayer.id].health;
-                            }
-                            localPlayer.score = otherPlayers[localPlayer.id].score;
-                            delete otherPlayers[localPlayer.id]; // Remove local player from otherPlayers list
-                        }
-
-                        // For other players, update their health and flash timer
-                        for (const id in otherPlayers) {
-                            if (otherPlayers[id]._prevHealth === undefined) {
-                                otherPlayers[id]._prevHealth = otherPlayers[id].health;
-                            }
-
-                            if (otherPlayers[id].health !== otherPlayers[id]._prevHealth) {
-                                if (otherPlayers[id].health < otherPlayers[id]._prevHealth) {
-                                    otherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                    createImpactParticles(otherPlayers[id].x, otherPlayers[id].y, otherPlayers[id].color);
-                                    if (otherPlayers[id].health <= 0) {
-                                        showNotification(`${otherPlayers[id].id} was defeated!`, 'error');
-                                    } else {
-                                        showNotification(`${otherPlayers[id].id} was hit!`, 'warning', 1500);
-                                    }
-                                }
-                            }
-                            otherPlayers[id]._prevHealth = otherPlayers[id].health;
+                        // Update player name input if it was a default and got confirmed, or changed by server
+                        if(playerNameInput.value === oldId || oldId.startsWith('Player_')) {
+                            playerNameInput.value = localPlayer.id;
+                            localStorage.setItem('playerName', localPlayer.id);
                         }
                         break;
-                    case 'player_hit':
-                        if (message.id === localPlayer.id) {
-                            localPlayer.health = message.newHealth;
-                            localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
-                            console.log(`Local player hit! Health: ${localPlayer.health}`);
-                            if (message.newHealth <= 0) {
-                                showNotification(`You were defeated!`, 'error');
-                            } else {
-                                showNotification(`You were hit!`, 'warning', 1500);
-                            }
-                        } else if (otherPlayers[message.id]) {
-                            otherPlayers[message.id].health = message.newHealth;
-                            otherPlayers[message.id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(otherPlayers[message.id].x, otherPlayers[message.id].y, otherPlayers[message.id].color);
-                            if (message.newHealth <= 0) {
-                                showNotification(`${otherPlayers[message.id].id} was defeated!`, 'error');
-                            } else {
-                                showNotification(`${otherPlayers[message.id].id} was hit!`, 'warning', 1500);
+
+                    case 'game_state_update':
+                        const serverPlayers = message.players || {};
+
+                        // --- Handle Join/Leave Notifications based on current `otherPlayers` vs `serverPlayers` ---
+                        // Identify players who joined (are in serverPlayers but not in current otherPlayers and not localPlayer)
+                        for (const id in serverPlayers) {
+                            if (id !== localPlayer.id && !otherPlayers[id]) {
+                                showNotification(`${serverPlayers[id].id || id} joined the game.`, 'info');
                             }
                         }
-                        if (message.hitX && message.hitY) {
+                        // Identify players who left (are in current otherPlayers but not in serverPlayers)
+                        for (const id in otherPlayers) {
+                            if (!serverPlayers[id]) {
+                                showNotification(`${otherPlayers[id].id || id} left the game.`, 'warning');
+                            }
+                        }
+
+                        // --- Update Local Player ---
+                        if (serverPlayers[localPlayer.id]) {
+                            const serverLocalData = serverPlayers[localPlayer.id];
+                            localPlayer.x = serverLocalData.x;
+                            localPlayer.y = serverLocalData.y;
+
+                            if (localPlayer.health !== serverLocalData.health) {
+                                if (localPlayer.health > serverLocalData.health) { // Took damage
+                                    localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION; // Already handled by 'player_hit' mostly
+                                    // createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color); // Also by 'player_hit'
+                                }
+                                // Check for respawn (health went from <=0 to MAX_HEALTH)
+                                if (localPlayer.health <=0 && serverLocalData.health === MAX_HEALTH_CLIENT) {
+                                    showNotification('You respawned!', 'success');
+                                }
+                                localPlayer.health = serverLocalData.health;
+                            }
+                            localPlayer.score = serverLocalData.score;
+                        }
+
+                        // --- Update Other Players ---
+                        const newOtherPlayers = {};
+                        for (const id in serverPlayers) {
+                            if (id !== localPlayer.id) {
+                                newOtherPlayers[id] = { ...serverPlayers[id] }; // Create a new object for the player
+
+                                const prevOtherPlayerState = otherPlayers[id]; // Get previous state if exists
+
+                                // Initialize or carry over _prevHealth. Server health is authoritative.
+                                newOtherPlayers[id]._prevHealth = prevOtherPlayerState ? prevOtherPlayerState.health : newOtherPlayers[id].health;
+                                newOtherPlayers[id].hitFlashTimer = prevOtherPlayerState ? prevOtherPlayerState.hitFlashTimer : 0; // Carry over flash timer
+
+                                // Health change detection for effects (hitFlashTimer is mostly set by 'player_hit')
+                                if (newOtherPlayers[id].health < newOtherPlayers[id]._prevHealth) { // Took damage
+                                    // newOtherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION; // Usually set by 'player_hit'
+                                    // createImpactParticles(newOtherPlayers[id].x, newOtherPlayers[id].y, newOtherPlayers[id].color); // by 'player_hit'
+                                    if (newOtherPlayers[id].health <= 0) {
+                                        // showNotification(`${newOtherPlayers[id].id} was defeated!`, 'error'); // Done by 'player_hit' typically
+                                    } else {
+                                        // showNotification(`${newOtherPlayers[id].id} was hit!`, 'warning', 1500); // by 'player_hit'
+                                    }
+                                }
+                                // Check for respawn for other players
+                                if (newOtherPlayers[id]._prevHealth <=0 && newOtherPlayers[id].health === MAX_HEALTH_CLIENT) {
+                                    showNotification(`${newOtherPlayers[id].id} respawned!`, 'info');
+                                    newOtherPlayers[id].hitFlashTimer = 0; // Reset flash on respawn
+                                }
+                                // _prevHealth is now current health for next comparison, but this is less critical here
+                                // as game_state_update is authoritative. We mainly use it for "change" detection.
+                            }
+                        }
+                        otherPlayers = newOtherPlayers;
+                        bullets = message.bullets || []; // Bullets state from server
+                        break;
+
+                    case 'player_hit': // Primarily for immediate visual/audio feedback
+                        const targetPlayer = message.id === localPlayer.id ? localPlayer : otherPlayers[message.id];
+                        if (targetPlayer) {
+                            targetPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                            // Use hitX, hitY from message for particle origin for accuracy
+                            createImpactParticles(message.hitX || targetPlayer.x, message.hitY || targetPlayer.y, targetPlayer.color);
+
+                            const shooterName = message.shooterId ? (serverPlayers[message.shooterId]?.id || message.shooterId) : 'someone';
+
+                            if (message.id === localPlayer.id) {
+                                if (message.newHealth <= 0 && localPlayer.health > 0) { // Check localPlayer.health to avoid duplicate defeat message
+                                    showNotification(`You were defeated by ${shooterName}!`, 'error');
+                                } else if (localPlayer.health > 0 && message.newHealth < localPlayer.health) {
+                                    showNotification(`You were hit by ${shooterName}!`, 'warning', 1500);
+                                }
+                                // localPlayer.health will be updated by game_state_update
+                            } else {
+                                if (message.newHealth <= 0 && targetPlayer.health > 0) {
+                                    showNotification(`${targetPlayer.id} was defeated by ${shooterName}!`, 'error');
+                                } else if (targetPlayer.health > 0 && message.newHealth < targetPlayer.health) {
+                                    showNotification(`${targetPlayer.id} was hit by ${shooterName}!`, 'warning', 1500);
+                                }
+                                // otherPlayers[message.id].health will be updated by game_state_update
+                            }
+                        }
+                        if (message.hitX && message.hitY) { // Create hit marker effect
                             hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION });
                         }
                         break;
+
+                    case 'player_joined': // When *another* player joins, server broadcasts this
+                        if (message.player && message.player.id !== localPlayer.id) {
+                            if (!otherPlayers[message.player.id]) { // Avoid adding if already present (e.g. from game_state_update)
+                                otherPlayers[message.player.id] = { ...message.player };
+                                otherPlayers[message.player.id].hitFlashTimer = 0; // Initialize
+                                // _prevHealth will be set by game_state_update effectively
+                                showNotification(`${message.player.id} joined the game.`, 'info');
+                            }
+                        }
+                        break;
+
                     case 'player_disconnected':
                         if (message.id && otherPlayers[message.id]) {
                             showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
                             delete otherPlayers[message.id];
                         }
                         break;
-                    case 'player_joined':
-                        if (message.player && message.player.id !== localPlayer.id) {
-                            showNotification(`${message.player.id} joined the game.`, 'info');
-                        }
-                        break;
                 }
             };
 
-            ws.onclose = () => {
-                console.log('Disconnected from WebSocket server. Attempting to reconnect in 3s...');
+            ws.onclose = (event) => {
+                console.log('Disconnected from WebSocket server. Attempting to reconnect in 3s...', event.reason, event.code);
                 connectionStatusSpan.textContent = 'Disconnected';
                 connectionStatusSpan.className = 'disconnected';
-                showNotification('Disconnected from server. Reconnecting...', 'error');
+                showNotification('Disconnected. Reconnecting...', 'error');
+                // Clear other players as their state is now unknown
+                otherPlayers = {};
+                bullets = [];
                 setTimeout(connectToServer, 3000);
             };
 
@@ -491,7 +528,9 @@
                 connectionStatusSpan.textContent = 'Error';
                 connectionStatusSpan.className = 'disconnected';
                 showNotification('WebSocket connection error!', 'error');
-                ws.close();
+                if (ws && ws.readyState !== WebSocket.CLOSED) {
+                    ws.close(); // Ensure it's closed before attempting reconnect by onclose
+                }
             };
         }
 
@@ -510,71 +549,95 @@
                 const speedY = Math.sin(angle) * speed;
                 const size = Math.random() * 2 + 1;
                 const life = Math.random() * 30 + 20;
-                const r = parseInt(baseColor.substring(4, 7));
-                const g = parseInt(baseColor.substring(8, 11));
-                const b = parseInt(baseColor.substring(12, 15));
-                const particleColor = `rgba(${r + Math.floor(Math.random()*50)}, ${g + Math.floor(Math.random()*50)}, ${b + Math.floor(Math.random()*50)}, 1)`;
+                let particleColor = baseColor; // Fallback
+                try {
+                    // Attempt to parse hsl or rgb color
+                    if (baseColor.startsWith('hsl')) {
+                        const parts = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+                        if (parts) {
+                            particleColor = `hsla(${parts[1]}, ${parts[2]}%, ${Math.min(100, parseInt(parts[3]) + 20)}%, ${Math.random()*0.5 + 0.5})`;
+                        }
+                    } else if (baseColor.startsWith('rgb')) {
+                         const r = parseInt(baseColor.substring(4, 7));
+                         const g = parseInt(baseColor.substring(8, 11));
+                         const b = parseInt(baseColor.substring(12, 15));
+                         particleColor = `rgba(${r + Math.floor(Math.random()*50)}, ${g + Math.floor(Math.random()*50)}, ${b + Math.floor(Math.random()*50)}, ${Math.random()*0.5 + 0.5})`;
+                    }
+                } catch(e) { /* use default baseColor */ }
                 particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
             }
         }
 
         function update() {
-            let movedX = 0;
-            let movedY = 0;
+            let dx = 0; // Delta X for this frame's input
+            let dy = 0; // Delta Y for this frame's input
 
-            // This is the client-side prediction logic
+            // Client-side prediction logic
             if (keys['arrowup'] || keys['w']) {
-                localPlayer.y -= PLAYER_SPEED;
-                movedY = -PLAYER_SPEED; // Indicate movement for sending to server
+                dy -= PLAYER_SPEED;
             }
             if (keys['arrowdown'] || keys['s']) {
-                localPlayer.y += PLAYER_SPEED;
-                movedY = PLAYER_SPEED; // Indicate movement for sending to server
+                dy += PLAYER_SPEED;
             }
             if (keys['arrowleft'] || keys['a']) {
-                localPlayer.x -= PLAYER_SPEED;
-                movedX = -PLAYER_SPEED; // Indicate movement for sending to server
+                dx -= PLAYER_SPEED;
             }
             if (keys['arrowright'] || keys['d']) {
-                localPlayer.x += PLAYER_SPEED;
-                movedX = PLAYER_SPEED; // Indicate movement for sending to server
+                dx += PLAYER_SPEED;
             }
 
-            // Clamp local player position to canvas bounds
+            // Normalize diagonal movement (optional but good practice)
+            if (dx !== 0 && dy !== 0) {
+                const length = Math.sqrt(dx * dx + dy * dy);
+                dx = (dx / length) * PLAYER_SPEED;
+                dy = (dy / length) * PLAYER_SPEED;
+            }
+
+            // Apply predicted movement
+            if (dx !== 0 || dy !== 0) {
+                localPlayer.x += dx;
+                localPlayer.y += dy;
+            }
+
+            // Clamp local player position to canvas bounds (visual prediction)
             localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
-            // Send movement to server if character moved
-            // Note: This sends absolute position (x,y) if server is set up to receive 'player_move'
-            // If your server expects 'player_input' with dx, dy, this will need to change.
-            if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
+            // Send movement input to server if character input occurred
+            if (ws && ws.readyState === WebSocket.OPEN && (dx !== 0 || dy !== 0)) {
+                ws.send(JSON.stringify({ type: 'player_input', dx: dx, dy: dy }));
             }
 
+            // Shooting
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
                 localPlayer.lastShotTime = Date.now();
-
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
-                // Send shoot action to server
+                // For now, shoot straight up. A real game would use mouse direction.
+                let bulletDirX = 0;
+                let bulletDirY = -1;
+                // TODO: Implement aiming (e.g., based on mouse position)
+                // const rect = canvas.getBoundingClientRect();
+                // const mouseClientX = lastMouseX; // You'd need to track mouse position
+                // const mouseClientY = lastMouseY;
+                // const mouseCanvasX = mouseClientX - rect.left;
+                // const mouseCanvasY = mouseClientY - rect.top;
+                // let aimX = mouseCanvasX - localPlayer.x;
+                // let aimY = mouseCanvasY - localPlayer.y;
+                // const len = Math.sqrt(aimX * aimX + aimY * aimY);
+                // if (len > 0) {
+                //     bulletDirX = aimX / len;
+                //     bulletDirY = aimY / len;
+                // }
+
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 })); // Always shoot up for now
+                    ws.send(JSON.stringify({ type: 'player_shoot', bulletDirX: bulletDirX, bulletDirY: bulletDirY }));
                 }
             }
 
-            // Update bullets (client-side prediction)
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                const bullet = bullets[i];
-                bullet.x += bullet.dirX * BULLET_SPEED;
-                bullet.y += bullet.dirY * BULLET_SPEED;
-                bullet.life--;
-
-                if (bullet.life <= 0 ||
-                    bullet.x < 0 || bullet.x > canvas.width ||
-                    bullet.y < 0 || bullet.y > canvas.height) {
-                    bullets.splice(i, 1);
-                }
-            }
+            // Client-side bullet prediction is less critical if server sends full bullet states
+            // We can remove client-side bullet movement prediction if server `game_state_update` is frequent enough
+            // For now, `bullets` array is fully replaced by server's `game_state_update`.
 
             // Update visual effects
             for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
@@ -610,78 +673,109 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // Draw bullets (received from server)
             bullets.forEach(bullet => {
                 ctx.beginPath();
                 ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
                 ctx.fillStyle = bullet.color;
                 ctx.fill();
 
-                const trailLength = BULLET_SPEED * 2;
+                // Simple trail effect
+                const trailLength = BULLET_SPEED * 1.5;
                 ctx.beginPath();
                 ctx.moveTo(bullet.x, bullet.y);
                 ctx.lineTo(bullet.x - bullet.dirX * trailLength, bullet.y - bullet.dirY * trailLength);
-                ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = `rgba(255, 255, 255, 0.3)`;
+                ctx.lineWidth = BULLET_RADIUS;
                 ctx.stroke();
             });
 
+            // Draw muzzle flashes
             muzzleFlashes.forEach(flash => {
                 const opacity = flash.timer / MUZZLE_FLASH_DURATION;
                 ctx.save();
-                ctx.globalAlpha = opacity;
-                ctx.fillStyle = `rgba(255, 255, 0, ${opacity})`;
+                ctx.globalAlpha = opacity * 0.8;
+                ctx.fillStyle = `rgba(255, 223, 0, ${opacity})`; // Yellowish
                 ctx.beginPath();
-                ctx.arc(flash.x, flash.y, PLAYER_RADIUS * 0.8 * (1 - opacity) + PLAYER_RADIUS * 0.5, 0, Math.PI * 2);
+                // Pulsating effect
+                const flashSize = PLAYER_RADIUS * (0.6 + (1 - opacity) * 0.4);
+                ctx.arc(flash.x, flash.y, flashSize, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             });
 
+            // Draw other players
             for (const id in otherPlayers) {
                 const player = otherPlayers[id];
+                ctx.save();
+                if (player.hitFlashTimer > 0) {
+                    const flashOpacity = (player.hitFlashTimer / PLAYER_HIT_FLASH_DURATION) * 0.7;
+                    ctx.fillStyle = `rgba(255, 0, 0, ${flashOpacity})`; // Red flash
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, PLAYER_RADIUS + 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 ctx.beginPath();
                 ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
                 ctx.fillStyle = player.color;
                 ctx.fill();
-                ctx.strokeStyle = player.hitFlashTimer > 0 ? 'red' : 'white';
-                ctx.lineWidth = player.hitFlashTimer > 0 ? 4 : 2;
+                ctx.strokeStyle = '#ddd'; // Lighter border for others
+                ctx.lineWidth = 2;
                 ctx.stroke();
+                ctx.restore();
 
-                ctx.fillStyle = 'red';
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
-                ctx.fillStyle = 'lime';
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (player.health / 100), 5);
+                // Health bar
+                ctx.fillStyle = '#555'; // Background
+                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
+                ctx.fillStyle = player.health > 30 ? 'limegreen' : 'red';
+                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * Math.max(0, player.health / MAX_HEALTH_CLIENT), 6);
 
+                // Name and Score
                 ctx.fillStyle = 'white';
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(`${player.id} (Score: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 10);
+                ctx.fillText(`${player.id} (S: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 12);
             }
 
+            // Draw local player
+            ctx.save();
+            if (localPlayer.hitFlashTimer > 0) {
+                const flashOpacity = (localPlayer.hitFlashTimer / PLAYER_HIT_FLASH_DURATION) * 0.8;
+                ctx.fillStyle = `rgba(255, 100, 100, ${flashOpacity})`; // Lighter red flash for self
+                ctx.beginPath();
+                ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS + 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.beginPath();
             ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = localPlayer.color;
             ctx.fill();
-            ctx.strokeStyle = localPlayer.hitFlashTimer > 0 ? 'red' : 'gold';
-            ctx.lineWidth = localPlayer.hitFlashTimer > 0 ? 5 : 3;
+            ctx.strokeStyle = 'gold'; // Gold border for local player
+            ctx.lineWidth = 3;
             ctx.stroke();
+            ctx.restore();
 
-            ctx.fillStyle = 'red';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2, 5);
-            ctx.fillStyle = 'lime';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 10, PLAYER_RADIUS * 2 * (localPlayer.health / 100), 5);
+            // Local player health bar
+            ctx.fillStyle = '#555';
+            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
+            ctx.fillStyle = localPlayer.health > 30 ? 'limegreen' : 'red';
+            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * Math.max(0, localPlayer.health / MAX_HEALTH_CLIENT), 6);
 
+            // Local player name and score
             ctx.fillStyle = 'white';
             ctx.font = '12px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(`You (${localPlayer.id}) Score: ${localPlayer.score}`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
+            ctx.fillText(`You: ${localPlayer.id} (Score: ${localPlayer.score})`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
 
+
+            // Draw hit markers
             hitMarkers.forEach(marker => {
                 const opacity = marker.timer / HIT_MARKER_DURATION;
                 ctx.save();
                 ctx.globalAlpha = opacity;
-                ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
-                ctx.lineWidth = 2;
-                const size = 10;
+                ctx.strokeStyle = `rgba(255, 50, 50, ${opacity * 0.8})`; // Reddish hit marker
+                ctx.lineWidth = 3;
+                const size = 8 + (1 - opacity) * 5; // Marker shrinks
                 ctx.beginPath();
                 ctx.moveTo(marker.x - size / 2, marker.y - size / 2);
                 ctx.lineTo(marker.x + size / 2, marker.y + size / 2);
@@ -691,6 +785,7 @@
                 ctx.restore();
             });
 
+            // Draw particles
             particles.forEach(p => p.draw(ctx));
         }
 
@@ -703,8 +798,10 @@
 
         // --- Input Handling (Keyboard) ---
         window.addEventListener('keydown', (e) => {
-            keys[e.key.toLowerCase()] = true;
-            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            // Prevent default for game keys to avoid scrolling etc.
+            if (key === ' ' || key.startsWith('arrow') || ['w', 'a', 's', 'd'].includes(key)) {
                 e.preventDefault();
             }
         });
@@ -713,127 +810,104 @@
             keys[e.key.toLowerCase()] = false;
         });
 
-        // --- Mobile/Touch Controls Input Handling (New) ---
+        // --- Mobile/Touch Controls Input Handling ---
         function addTouchAndMouseListeners(element, keyName) {
             const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
             const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
-            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave'; // For when finger slides off or mouse leaves
+            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave';
 
             element.addEventListener(startEvent, (e) => {
-                e.preventDefault(); // Prevent scrolling/default behavior
+                e.preventDefault();
                 keys[keyName] = true;
-                // console.log(`Button ${keyName} pressed`); // Debugging mobile input
-            }, { passive: false }); // passive: false to allow preventDefault
+            }, { passive: false });
 
             element.addEventListener(endEvent, (e) => {
-                e.preventDefault();
+                e.preventDefault(); // Might not be strictly necessary for end event but good for consistency
                 keys[keyName] = false;
-                // console.log(`Button ${keyName} released`); // Debugging mobile input
             });
 
-            // Handle cases where touch/mouse leaves the button area before release
             element.addEventListener(leaveEvent, (e) => {
-                 if (keys[keyName]) { // Only if it was previously pressed by this interaction
+                 if (keys[keyName]) {
                     keys[keyName] = false;
-                    // console.log(`Button ${keyName} left area, released`);
                  }
             });
         }
 
-        // Attach listeners to mobile control buttons
-        addTouchAndMouseListeners(moveUpButton, 'w');
-        addTouchAndMouseListeners(moveDownButton, 's');
-        addTouchAndMouseListeners(moveLeftButton, 'a');
-        addTouchAndMouseListeners(moveRightButton, 'd');
-        addTouchAndMouseListeners(shootButton, ' ');
-
+        addTouchAndMouseListeners(moveUpButton, 'w'); // Map to 'w' for unified handling
+        addTouchAndMouseListeners(moveDownButton, 's'); // Map to 's'
+        addTouchAndMouseListeners(moveLeftButton, 'a'); // Map to 'a'
+        addTouchAndMouseListeners(moveRightButton, 'd'); // Map to 'd'
+        addTouchAndMouseListeners(shootButton, ' '); // Map to spacebar
 
         // --- Fullscreen Toggle ---
-        fullscreenButton.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
+        function toggleFullscreen() {
+            if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
                 if (canvas.requestFullscreen) {
                     canvas.requestFullscreen();
-                } else if (canvas.mozRequestFullScreen) {
+                } else if (canvas.mozRequestFullScreen) { /* Firefox */
                     canvas.mozRequestFullScreen();
-                } else if (canvas.webkitRequestFullscreen) {
+                } else if (canvas.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
                     canvas.webkitRequestFullscreen();
-                } else if (canvas.msRequestFullscreen) {
+                } else if (canvas.msRequestFullscreen) { /* IE/Edge */
                     canvas.msRequestFullscreen();
                 }
             } else {
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
-                } else if (document.mozCancelFullScreen) {
+                } else if (document.mozCancelFullScreen) { /* Firefox */
                     document.mozCancelFullScreen();
-                } else if (document.webkitExitFullscreen) {
+                } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
                     document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) {
+                } else if (document.msExitFullscreen) { /* IE/Edge */
                     document.msExitFullscreen();
                 }
             }
-        });
+        }
+        fullscreenButton.addEventListener('click', toggleFullscreen);
 
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) {
+        function updateFullscreenButtonText() {
+            if (document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
                 fullscreenButton.textContent = 'Exit Fullscreen';
             } else {
                 fullscreenButton.textContent = 'Toggle Fullscreen';
             }
-        });
-        document.addEventListener('mozfullscreenchange', () => {
-            if (document.mozFullScreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
-        });
-        document.addEventListener('webkitfullscreenchange', () => {
-            if (document.webkitFullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
-        });
-        document.addEventListener('msfullscreenchange', () => {
-            if (document.msFullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
+        }
+        ['fullscreenchange', 'mozfullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(event => {
+            document.addEventListener(event, updateFullscreenButtonText, false);
         });
 
         // --- Player Name Logic ---
         setPlayerNameButton.addEventListener('click', () => {
             let newName = playerNameInput.value.trim();
             if (newName.length === 0) {
-                newName = 'Player_' + Math.floor(Math.random() * 1000);
-                playerNameInput.value = newName;
+                newName = 'Player_' + Math.floor(Math.random() * 1000); // Default if empty
             }
-            if (newName.length > 12) {
-                newName = newName.substring(0, 12);
-                playerNameInput.value = newName;
-            }
+            newName = newName.substring(0, 12); // Max length
+            playerNameInput.value = newName; // Update input field with sanitized name
 
             if (localPlayer.id !== newName) {
-                localPlayer.id = newName;
+                const oldName = localPlayer.id;
+                localPlayer.id = newName; // Tentatively update local id
                 localStorage.setItem('playerName', newName);
-                showNotification(`Your name set to: ${newName}. Reconnecting...`, 'info');
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.close();
+                showNotification(`Name changed to: ${newName}. Reconnecting...`, 'info');
+
+                if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                    ws.onclose = null; // Prevent default reconnect logic briefly
+                    ws.close(1000, "User changed name"); // Clean close
+                    setTimeout(connectToServer, 100); // Reconnect with new name info
                 } else {
-                    connectToServer();
+                    connectToServer(); // If not connected, just connect
                 }
             } else {
                 showNotification(`Name is already ${newName}.`, 'info', 1500);
             }
         });
 
-        // --- Prevent Page Refresh/Leaving ---
-        window.addEventListener('beforeunload', (event) => {
-            event.preventDefault();
-            event.returnValue = '';
-            return 'Are you sure you want to leave? Your game session will be lost.';
-        });
+        // --- Prevent Page Refresh/Leaving (Optional) ---
+        // window.addEventListener('beforeunload', (event) => {
+        //     event.preventDefault();
+        //     event.returnValue = 'Are you sure you want to leave? Your game progress will be lost.';
+        // });
     </script>
 </body>
 </html>
