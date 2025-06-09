@@ -40,7 +40,7 @@
             -ms-user-select: none;
             user-select: none;
             touch-action: manipulation;
-            /* REMOVED: overflow: hidden; */ /* Allow body scrolling */
+            /* overflow: hidden;  This was removed to allow scrolling */
         }
 
         h1 {
@@ -188,9 +188,9 @@
         .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
         .notification.error { border-color: var(--accent-color-red); }
 
-        /* Mobile Controls */
+        /* Mobile Controls - Hidden by default, shown by JS */
         .mobile-controls-container {
-            display: flex;
+            display: none; /* NEW: Hidden by default */
             justify-content: space-between;
             align-items: flex-end;
             width: 100%;
@@ -282,911 +282,1137 @@
             backdrop-filter: blur(5px); /* Frosted glass effect */
         }
 
-        .modal-content {
-            background-color: var(--modal-bg);
-            margin: auto;
-            padding: 30px;
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            width: 80%;
-            max-width: 500px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
-            animation: fadeIn 0.3s ease-out;
-            position: relative; /* For close button positioning */
-            text-align: center;
+     <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
         }
 
-        .modal-content h3 {
-            font-family: 'Orbitron', sans-serif;
-            color: var(--accent-color-gold);
-            margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 1.8em;
-        }
-
-        .modal-content label {
-            display: block;
-            margin-bottom: 10px;
-            font-size: 1.1em;
-            color: var(--text-color);
-        }
-
-        .modal-content .setting-row {
+        body {
+            font-family: 'Lato', sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .modal-content button {
-            margin-top: 15px;
-            width: auto; /* Allow button to size naturally */
-        }
-
-        .close-button {
-            color: #aaa;
-            position: absolute;
-            top: 15px;
-            right: 25px;
-            font-size: 30px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: color 0.2s ease;
-        }
-
-        .close-button:hover,
-        .close-button:focus {
-            color: var(--accent-color-red);
-            text-decoration: none;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Scoreboard */
-        #scoreboard {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background-color: rgba(46, 48, 74, 0.85); /* Semi-transparent */
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            border: 1px solid var(--border-color);
-            max-height: 70vh;
-            overflow-y: auto;
-            width: 200px;
-            text-align: left;
-        }
-        #scoreboard h3 {
-            font-family: 'Orbitron', sans-serif;
-            color: var(--accent-color-gold);
-            margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 1.2em;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 8px;
-        }
-        #scoreboard ul {
-            list-style: none;
-            padding: 0;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
             margin: 0;
-        }
-        #scoreboard li {
-            padding: 6px 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.9em;
-            border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
-        }
-        #scoreboard li:last-child {
-            border-bottom: none;
-        }
-        #scoreboard .player-name {
-            font-weight: bold;
-            color: var(--text-color);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 65%; /* Limit name width */
-        }
-        #scoreboard .player-score {
-            color: var(--accent-color-gold);
-        }
-        #scoreboard li.local-player .player-name {
-            color: var(--accent-color-gold); /* Highlight local player */
+            padding: 20px;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            /* overflow: hidden;  This was removed to allow scrolling */
         }
 
-        /* General layout adjustments */
-        .game-controls {
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .ui-container {
             display: flex;
+            flex-direction: column;
+            align-items: center;
             gap: 15px;
-            justify-content: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
             margin-bottom: 15px;
         }
-        .game-controls button {
-            width: 180px; /* Consistent width */
-        }
 
-        .info-panel {
-            margin-top: 20px;
-            text-align: left;
-            width: 100%;
-        }
-        .info-panel .status-line {
-            text-align: center;
+        .panel p {
             margin-bottom: 10px;
-            font-size: 1.1em;
+            line-height: 1.5;
         }
 
-        /* Hide elements if JS is disabled */
-        noscript {
-            display: block;
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
             text-align: center;
-            color: red;
-            font-size: 1.2em;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
+
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
+
+        /* Mobile Controls - Hidden by default, shown by JS */
+        .mobile-controls-container {
+            display: none; /* NEW: Hidden by default */
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
             margin-top: 20px;
+            padding: 10px 0;
         }
 
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            h1 { font-size: 2em; }
-            canvas { width: 100%; height: auto; } /* Allow canvas to scale */
-            .mobile-controls-container { flex-direction: column; align-items: center; }
-            .d-pad { margin-bottom: 20px; }
-            .action-buttons { margin-right: 0; }
-            .action-buttons button { width: 80px; height: 80px; font-size: 1.3em; padding: 15px; }
-            #scoreboard { top: 10px; left: 10px; width: 180px; }
-            #notification-area { top: 10px; right: 10px; width: 220px; }
-            .panel { padding: 15px; }
-            .modal-content { width: 95%; padding: 20px; }
-            .modal-content h3 { font-size: 1.5em; }
-            .modal-content .setting-row { flex-direction: column; gap: 10px; }
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
         }
-    </style>
-</head>
-<body>
-    <div id="notification-area"></div>
-    <div id="scoreboard">
-        <h3>SCOREBOARD</h3>
-        <ul id="playerScoresList">
-            <!-- Scores will be dynamically inserted here -->
-        </ul>
-    </div>
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
 
-    <h1>Multiplayer 2D Shooter</h1>
-
-    <div class="ui-container">
-        <div class="game-controls">
-            <button id="openSettingsButton">Settings</button>
-            <button id="fullscreenButton">Toggle Fullscreen</button>
-        </div>
-    
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-    
-        <!-- Mobile Controls -->
-        <div class="mobile-controls-container">
-            <div class="d-pad">
-                <button id="moveUp" class="up">↑</button>
-                <button id="moveLeft" class="left">←</button>
-                <div class="center"></div> <!-- Placeholder -->
-                <button id="moveRight" class="right">→</button>
-                <button id="moveDown" class="down">↓</button>
-            </div>
-            <div class="action-buttons">
-                <button id="shootButton">SHOOT</button>
-            </div>
-        </div>
-    
-        <div class="info-panel panel">
-            <h2 class="status-line">Game Status: <span id="connectionStatus" class="disconnected">Disconnected</span></h2>
-            <p>This is a **client-side demonstration** of a multiplayer game concept, powered by WebSockets.</p>
-            <p>A **real multiplayer game** requires a dedicated **server** to manage game logic, player synchronization, and communication between all clients.</p>
-            <p class="controls-info"><strong>Controls:</strong>
-                <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen D-Pad**
-                <br>Shoot: <kbd>Spacebar</kbd> / **On-screen SHOOT button**
-            </p>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" id="closeSettingsButton">&times;</span>
-            <h3>Game Settings</h3>
-            
-            <div class="setting-row">
-                <label for="playerNameInput">Your Name:</label>
-                <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="12">
-                <button id="setPlayerNameButton">Save Name</button>
-            </div>
-
-            <div class="setting-row">
-                <label for="playerColorInput">Your Color:</label>
-                <input type="color" id="playerColorInput">
-                <button id="setPlayerColorButton">Set Color</button>
-            </div>
-
-            <!-- Future settings could go here -->
-            <p style="font-size: 0.9em; color: #aaa;">More settings coming soon!</p>
-        </div>
-    </div>
-
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const connectionStatusSpan = document.getElementById('connectionStatus');
-        const fullscreenButton = document.getElementById('fullscreenButton');
-        const playerNameInput = document.getElementById('playerNameInput');
-        const setPlayerNameButton = document.getElementById('setPlayerNameButton');
-        const playerColorInput = document.getElementById('playerColorInput'); 
-        const setPlayerColorButton = document.getElementById('setPlayerColorButton'); 
-        const notificationArea = document.getElementById('notification-area');
-        const settingsModal = document.getElementById('settingsModal'); 
-        const openSettingsButton = document.getElementById('openSettingsButton'); 
-        const closeSettingsButton = document.getElementById('closeSettingsButton'); 
-        const playerScoresList = document.getElementById('playerScoresList'); 
-
-        const moveUpButton = document.getElementById('moveUp');
-        const moveDownButton = document.getElementById('moveDown');
-        const moveLeftButton = document.getElementById('moveLeft');
-        const moveRightButton = document.getElementById('moveRight');
-        const shootButton = document.getElementById('shootButton');
-
-        const PLAYER_SPEED = 3; 
-        const BULLET_SPEED = 10;
-        const PLAYER_RADIUS = 15;
-        const BULLET_RADIUS = 3;
-        const BULLET_LIFETIME = 60; 
-        const MUZZLE_FLASH_DURATION = 5; 
-        const HIT_MARKER_DURATION = 15; 
-        const PLAYER_HIT_FLASH_DURATION = 10; 
-        const NOTIFICATION_DISPLAY_TIME = 3000; 
-        const INITIAL_MAX_HEALTH_CLIENT = 100; 
-
-        // Load or generate player name and color
-        let defaultPlayerName = localStorage.getItem('playerName') || 'Player_' + Math.floor(Math.random() * 1000);
-        let defaultPlayerColor = localStorage.getItem('playerColor') || `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`; 
-        
-        playerNameInput.value = defaultPlayerName;
-        playerColorInput.value = defaultPlayerColor;
-
-        let localPlayer = {
-            id: defaultPlayerName,
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            color: defaultPlayerColor, 
-            health: INITIAL_MAX_HEALTH_CLIENT,
-            maxHealth: INITIAL_MAX_HEALTH_CLIENT, 
-            score: 0,
-            lastShotTime: 0,
-            shootCooldown: 200, 
-            muzzleFlashTimer: 0,
-            hitFlashTimer: 0
-        };
-
-        let otherPlayers = {}; 
-        let bullets = []; 
-        let keys = {}; 
-
-        let muzzleFlashes = [];
-        let hitMarkers = [];
-        let particles = [];
-
-        class Particle {
-            constructor(x, y, color, size, speedX, speedY, life) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
-                this.size = size;
-                this.speedX = speedX;
-                this.speedY = speedY;
-                this.life = life;
-                this.opacity = 1;
-                this.decay = 1 / life;
-            }
-
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                this.opacity -= this.decay;
-                this.life--;
-                return this.life > 0;
-            }
-
-            draw(ctx) {
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, this.opacity);
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            }
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .action-buttons button:active {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+            transform: scale(0.9);
+        }
+        .action-buttons button:hover {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
         }
 
-        function showNotification(message, type = 'info', duration = NOTIFICATION_DISPLAY_TIME) {
-            const notificationDiv = document.createElement('div');
-            notificationDiv.classList.add('notification', type);
-            notificationDiv.textContent = message;
-            notificationArea.prepend(notificationDiv);
-
-            setTimeout(() => notificationDiv.classList.add('show'), 10);
-
-            setTimeout(() => {
-                notificationDiv.classList.remove('show');
-                notificationDiv.classList.add('hide');
-                notificationDiv.addEventListener('transitionend', () => {
-                    notificationDiv.remove();
-                }, { once: true });
-            }, duration);
+        /* Modal / Settings Panel */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1001; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.7); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px); /* Frosted glass effect */
         }
 
-        let ws;
-
-        function connectToServer() {
-            const WEBSOCKET_URL = 'wss://game.meho.dpdns.org';
-
-            ws = new WebSocket(WEBSOCKET_URL);
-
-            ws.onopen = () => {
-                console.log('Connected to WebSocket server.');
-                connectionStatusSpan.textContent = 'Connected';
-                connectionStatusSpan.className = 'connected';
-                // Send player data including color on join
-                ws.send(JSON.stringify({ type: 'player_join', player: {
-                    id: localPlayer.id,
-                    x: localPlayer.x,
-                    y: localPlayer.y,
-                    color: localPlayer.color 
-                }}));
-                showNotification(`Connected! Welcome, ${localPlayer.id}!`, 'success');
-            };
-
-
-            ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                // console.log('Client received:', message); 
-
-                switch (message.type) {
-                    case 'player_id_confirmed':
-                        const oldId = localPlayer.id;
-                        if (message.id !== localPlayer.id) {
-                            localPlayer.id = message.id; 
-                            showNotification(`Your name was updated to: ${localPlayer.id} (was ${oldId})`, 'success');
-                        } else {
-                            showNotification(`Successfully joined as ${localPlayer.id}!`, 'success');
-                        }
-                        if(playerNameInput.value === oldId || oldId.startsWith('Player_')) {
-                            playerNameInput.value = localPlayer.id;
-                            localStorage.setItem('playerName', localPlayer.id);
-                        }
-                        break;
-
-                    case 'game_state_update':
-                        const serverPlayers = message.players || {};
-
-                        for (const id in serverPlayers) {
-                            if (id !== localPlayer.id && !otherPlayers[id]) {
-                                showNotification(`${serverPlayers[id].id || id} joined the game.`, 'info');
-                            }
-                        }
-                        for (const id in otherPlayers) {
-                            if (!serverPlayers[id]) {
-                                showNotification(`${otherPlayers[id].id || id} left the game.`, 'warning');
-                            }
-                        }
-
-                        // --- Update Local Player ---
-                        if (serverPlayers[localPlayer.id]) {
-                            const serverLocalData = serverPlayers[localPlayer.id];
-                            localPlayer.x = serverLocalData.x;
-                            localPlayer.y = serverLocalData.y;
-
-                            if (localPlayer.health !== serverLocalData.health) {
-                                if (localPlayer.health > serverLocalData.health) { 
-                                    localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION; 
-                                }
-                                if (localPlayer.health <=0 && serverLocalData.health === serverLocalData.maxHealth) { 
-                                    showNotification('You respawned!', 'success');
-                                }
-                                localPlayer.health = serverLocalData.health;
-                            }
-                            localPlayer.score = serverLocalData.score;
-                            localPlayer.maxHealth = serverLocalData.maxHealth; 
-                            localPlayer.color = serverLocalData.color; 
-                        }
-
-                        // --- Update Other Players ---
-                        const newOtherPlayers = {};
-                        for (const id in serverPlayers) {
-                            if (id !== localPlayer.id) {
-                                newOtherPlayers[id] = { ...serverPlayers[id] }; 
-
-                                const prevOtherPlayerState = otherPlayers[id]; 
-
-                                newOtherPlayers[id]._prevHealth = prevOtherPlayerState ? prevOtherPlayerState.health : newOtherPlayers[id].health;
-                                newOtherPlayers[id].hitFlashTimer = prevOtherPlayerState ? prevOtherPlayerState.hitFlashTimer : 0; 
-
-                                if (newOtherPlayers[id].health < newOtherPlayers[id]._prevHealth) { 
-                                    if (newOtherPlayers[id].health <= 0) {
-                                    } else {
-                                    }
-                                }
-                                if (newOtherPlayers[id]._prevHealth <=0 && newOtherPlayers[id].health === newOtherPlayers[id].maxHealth) { 
-                                    showNotification(`${newOtherPlayers[id].id} respawned!`, 'info');
-                                    newOtherPlayers[id].hitFlashTimer = 0; 
-                                }
-                            }
-                        }
-                        otherPlayers = newOtherPlayers;
-                        bullets = message.bullets || []; 
-                        
-                        updateScoreboard(); 
-                        break;
-
-                    case 'player_hit': 
-                        const targetPlayer = message.id === localPlayer.id ? localPlayer : otherPlayers[message.id];
-                        if (targetPlayer) {
-                            targetPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(message.hitX || targetPlayer.x, message.hitY || targetPlayer.y, targetPlayer.color);
-
-                            const shooterName = message.shooterId ? (serverPlayers[message.shooterId]?.id || message.shooterId) : 'someone';
-
-                            if (message.id === localPlayer.id) {
-                                if (message.newHealth <= 0 && localPlayer.health > 0) { 
-                                    showNotification(`You were defeated by ${shooterName}!`, 'error');
-                                } else if (localPlayer.health > 0 && message.newHealth < localPlayer.health) {
-                                    showNotification(`You were hit by ${shooterName}!`, 'warning', 1500);
-                                }
-                            } else {
-                                if (message.newHealth <= 0 && targetPlayer.health > 0) {
-                                    showNotification(`${targetPlayer.id} was defeated by ${shooterName}!`, 'error');
-                                } else if (targetPlayer.health > 0 && message.newHealth < targetPlayer.health) {
-                                    showNotification(`${targetPlayer.id} was hit by ${shooterName}!`, 'warning', 1500);
-                                }
-                            }
-                        }
-                        if (message.hitX && message.hitY) { 
-                            hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION }); 
-                        }
-                        break;
-
-                    case 'player_upgraded_health': 
-                        const upgradedPlayer = message.id === localPlayer.id ? localPlayer : otherPlayers[message.id];
-                        if (upgradedPlayer) {
-                            const playerName = upgradedPlayer.id;
-                            showNotification(`${playerName} achieved ${message.score} score and gained extra health!`, 'success', 4000);
-                            if (message.id === localPlayer.id) {
-                                localPlayer.maxHealth = message.newMaxHealth;
-                            } else if (otherPlayers[message.id]) {
-                                otherPlayers[message.id].maxHealth = message.newMaxHealth;
-                            }
-                        }
-                        break;
-
-                    case 'player_joined': 
-                        if (message.player && message.player.id !== localPlayer.id) {
-                            if (!otherPlayers[message.player.id]) { 
-                                otherPlayers[message.player.id] = { ...message.player };
-                                otherPlayers[message.player.id].hitFlashTimer = 0; 
-                                showNotification(`${message.player.id} joined the game.`, 'info');
-                            }
-                        }
-                        break;
-
-                    case 'player_disconnected':
-                        if (message.id && otherPlayers[message.id]) {
-                            showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
-                            delete otherPlayers[message.id];
-                        }
-                        break;
-                }
-            };
-
-            ws.onclose = (event) => {
-                console.log('Disconnected from WebSocket server. Attempting to reconnect in 3s...', event.reason, event.code);
-                connectionStatusSpan.textContent = 'Disconnected';
-                connectionStatusSpan.className = 'disconnected';
-                showNotification('Disconnected. Reconnecting...', 'error');
-                otherPlayers = {};
-                bullets = [];
-                setTimeout(connectToServer, 3000);
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                connectionStatusSpan.textContent = 'Error';
-                connectionStatusSpan.className = 'disconnected';
-                showNotification('WebSocket connection error!', 'error');
-                if (ws && ws.readyState !== WebSocket.CLOSED) {
-                    ws.close(); 
-                }
-            };
+     <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
         }
 
-        document.addEventListener('DOMContentLoaded', connectToServer);
-
-        function createMuzzleFlash(x, y, color) {
-            muzzleFlashes.push({ x, y, color, timer: MUZZLE_FLASH_DURATION });
+        body {
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            /* overflow: hidden;  This was removed to allow scrolling */
         }
 
-        function createImpactParticles(x, y, baseColor) {
-            const numParticles = 10 + Math.floor(Math.random() * 5);
-            for (let i = 0; i < numParticles; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 3 + 1;
-                const speedX = Math.cos(angle) * speed;
-                const speedY = Math.sin(angle) * speed;
-                const size = Math.random() * 2 + 1;
-                const life = Math.random() * 30 + 20;
-                let particleColor = baseColor; 
-                try {
-                    if (baseColor.startsWith('#')) {
-                        let r = parseInt(baseColor.substring(1, 3), 16);
-                        let g = parseInt(baseColor.substring(3, 5), 16);
-                        let b = parseInt(baseColor.substring(5, 7), 16);
-                        r = Math.min(255, r + Math.floor(Math.random() * 40 - 20));
-                        g = Math.min(255, g + Math.floor(Math.random() * 40 - 20));
-                        b = Math.min(255, b + Math.floor(Math.random() * 40 - 20));
-                        particleColor = `rgba(${r}, ${g}, ${b}, ${Math.random() * 0.5 + 0.5})`;
-                    } else { 
-                        particleColor = baseColor;
-                    }
-                } catch(e) { }
-                particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
-            }
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
         }
 
-        function update() {
-            let dx = 0; 
-            let dy = 0; 
-
-            if (keys['arrowup'] || keys['w']) { dy -= PLAYER_SPEED; }
-            if (keys['arrowdown'] || keys['s']) { dy += PLAYER_SPEED; }
-            if (keys['arrowleft'] || keys['a']) { dx -= PLAYER_SPEED; }
-            if (keys['arrowright'] || keys['d']) { dx += PLAYER_SPEED; }
-
-            if (dx !== 0 && dy !== 0) {
-                const length = Math.sqrt(dx * dx + dy * dy);
-                dx = (dx / length) * PLAYER_SPEED;
-                dy = (dy / length) * PLAYER_SPEED;
-            }
-
-            if (dx !== 0 || dy !== 0) {
-                localPlayer.x += dx;
-                localPlayer.y += dy;
-            }
-
-            localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
-            localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
-
-            if (ws && ws.readyState === WebSocket.OPEN && (dx !== 0 || dy !== 0)) {
-                ws.send(JSON.stringify({ type: 'player_input', dx: dx, dy: dy }));
-            }
-
-            if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
-                localPlayer.lastShotTime = Date.now();
-                createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
-
-                let bulletDirX = 0;
-                let bulletDirY = -1; 
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', bulletDirX: bulletDirX, bulletDirY: bulletDirY }));
-                }
-            }
-
-            for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
-                muzzleFlashes[i].timer--;
-                if (muzzleFlashes[i].timer <= 0) { muzzleFlashes.splice(i, 1); }
-            }
-            for (let i = hitMarkers.length - 1; i >= 0; i--) {
-                hitMarkers[i].timer--;
-                if (hitMarkers[i].timer <= 0) { hitMarkers.splice(i, 1); }
-            }
-            for (let i = particles.length - 1; i >= 0; i--) {
-                if (!particles[i].update()) { particles.splice(i, 1); }
-            }
-            if (localPlayer.hitFlashTimer > 0) { localPlayer.hitFlashTimer--; }
-            for (const id in otherPlayers) {
-                if (otherPlayers[id].hitFlashTimer > 0) { otherPlayers[id].hitFlashTimer--; }
-            }
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 20px;
+            border-radius: 8px;
         }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            bullets.forEach(bullet => {
-                ctx.beginPath();
-                ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
-                ctx.fillStyle = bullet.color;
-                ctx.fill();
-
-                const trailLength = BULLET_SPEED * 1.5;
-                ctx.beginPath();
-                ctx.moveTo(bullet.x, bullet.y);
-                ctx.lineTo(bullet.x - bullet.dirX * trailLength, bullet.y - bullet.dirY * trailLength);
-                ctx.strokeStyle = `rgba(255, 255, 255, 0.3)`;
-                ctx.lineWidth = BULLET_RADIUS;
-                ctx.stroke();
-            });
-
-            muzzleFlashes.forEach(flash => {
-                const opacity = flash.timer / MUZZLE_FLASH_DURATION;
-                ctx.save();
-                ctx.globalAlpha = opacity * 0.8;
-                ctx.fillStyle = `rgba(255, 223, 0, ${opacity})`; 
-                ctx.beginPath();
-                const flashSize = PLAYER_RADIUS * (0.6 + (1 - opacity) * 0.4);
-                ctx.arc(flash.x, flash.y, flashSize, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            });
-
-            for (const id in otherPlayers) {
-                const player = otherPlayers[id];
-                ctx.save();
-                if (player.hitFlashTimer > 0) {
-                    const flashOpacity = (player.hitFlashTimer / PLAYER_HIT_FLASH_DURATION) * 0.7;
-                    ctx.fillStyle = `rgba(255, 0, 0, ${flashOpacity})`; 
-                    ctx.beginPath();
-                    ctx.arc(player.x, player.y, PLAYER_RADIUS + 3, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                ctx.beginPath();
-                ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
-                ctx.fillStyle = player.color;
-                ctx.fill();
-                ctx.strokeStyle = '#ddd'; 
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.restore();
-
-                // Health bar
-                ctx.fillStyle = '#555'; 
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
-                const healthPercentage = Math.max(0, player.health / player.maxHealth);
-                ctx.fillStyle = healthPercentage > 0.3 ? 'limegreen' : 'red';
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * healthPercentage, 6);
-
-                // Name and Score
-                ctx.fillStyle = 'white';
-                ctx.font = '10px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${player.id} (S: ${player.score})`, player.x, player.y + PLAYER_RADIUS + 12);
-            }
-
-            // Draw local player
-            ctx.save();
-            if (localPlayer.hitFlashTimer > 0) {
-                const flashOpacity = (localPlayer.hitFlashTimer / PLAYER_HIT_FLASH_DURATION) * 0.8;
-                ctx.fillStyle = `rgba(255, 100, 100, ${flashOpacity})`; 
-                ctx.beginPath();
-                ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS + 4, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.beginPath();
-            ctx.arc(localPlayer.x, localPlayer.y, PLAYER_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = localPlayer.color;
-            ctx.fill();
-            ctx.strokeStyle = 'gold'; 
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.restore();
-
-            // Local player health bar
-            ctx.fillStyle = '#555';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
-            const localHealthPercentage = Math.max(0, localPlayer.health / localPlayer.maxHealth);
-            ctx.fillStyle = localHealthPercentage > 0.3 ? 'limegreen' : 'red';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * localHealthPercentage, 6);
-
-            // Local player name and score
-            ctx.fillStyle = 'white';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`You: ${localPlayer.id} (Score: ${localPlayer.score})`, localPlayer.x, localPlayer.y + PLAYER_RADIUS + 15);
-
-
-            // Draw hit markers
-            hitMarkers.forEach(marker => {
-                const opacity = marker.timer / HIT_MARKER_DURATION;
-                ctx.save();
-                ctx.globalAlpha = opacity;
-                ctx.strokeStyle = `rgba(255, 50, 50, ${opacity * 0.8})`; 
-                ctx.lineWidth = 3;
-                const size = 8 + (1 - opacity) * 5; 
-                ctx.beginPath();
-                ctx.moveTo(marker.x - size / 2, marker.y - size / 2);
-                ctx.lineTo(marker.x + size / 2, marker.y + size / 2);
-                ctx.moveTo(marker.x + size / 2, marker.y - size / 2);
-                ctx.lineTo(marker.x - size / 2, marker.y + size / 2);
-                ctx.stroke();
-                ctx.restore();
-            });
-
-            // Draw particles
-            particles.forEach(p => p.draw(ctx));
+        .ui-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
         }
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-        gameLoop();
-
-        // --- Scoreboard Update Function ---
-        function updateScoreboard() {
-            const allPlayers = Object.values(otherPlayers).concat(localPlayer);
-            allPlayers.sort((a, b) => b.score - a.score);
-
-            playerScoresList.innerHTML = ''; 
-
-            allPlayers.forEach(player => {
-                const listItem = document.createElement('li');
-                listItem.innerHTML = `<span class="player-name" style="color: ${player.color};">${player.id}</span> <span class="player-score">${player.score}</span>`;
-                if (player.id === localPlayer.id) {
-                    listItem.classList.add('local-player'); 
-                }
-                playerScoresList.appendChild(listItem);
-            });
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
         }
 
-
-        // --- Input Handling (Keyboard) ---
-        window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            keys[key] = true;
-            if (key === ' ' || key.startsWith('arrow') || ['w', 'a', 's', 'd'].includes(key)) {
-                e.preventDefault();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            keys[e.key.toLowerCase()] = false;
-        });
-
-        // --- Mobile/Touch Controls Input Handling ---
-        function addTouchAndMouseListeners(element, keyName) {
-            const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
-            const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
-            const leaveEvent = 'ontouchend' in window ? 'touchcancel' : 'mouseleave';
-
-            element.addEventListener(startEvent, (e) => {
-                e.preventDefault();
-                keys[keyName] = true;
-            }, { passive: false });
-
-            element.addEventListener(endEvent, (e) => {
-                e.preventDefault(); 
-                keys[keyName] = false;
-            });
-
-            element.addEventListener(leaveEvent, (e) => {
-                 if (keys[keyName]) {
-                    keys[keyName] = false;
-                 }
-            });
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
         }
 
-        addTouchAndMouseListeners(moveUpButton, 'w'); 
-        addTouchAndMouseListeners(moveDownButton, 's'); 
-        addTouchAndMouseListeners(moveLeftButton, 'a'); 
-        addTouchAndMouseListeners(moveRightButton, 'd'); 
-        addTouchAndMouseListeners(shootButton, ' '); 
-
-        // --- Fullscreen Toggle ---
-        function toggleFullscreen() {
-            if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
-                if (canvas.requestFullscreen) {
-                    canvas.requestFullscreen();
-                } else if (canvas.mozRequestFullScreen) { 
-                    canvas.mozRequestFullScreen();
-                } else if (canvas.webkitRequestFullscreen) { 
-                    canvas.webkitRequestFullscreen();
-                } else if (canvas.msRequestFullscreen) { 
-                    canvas.msRequestFullscreen();
-                }
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.mozCancelFullScreen) { 
-                    document.mozCancelFullScreen();
-                } else if (document.webkitExitFullscreen) { 
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) { 
-                    document.msExitFullscreen();
-                }
-            }
+        .panel p {
+            margin-bottom: 10px;
+            line-height: 1.5;
         }
-        fullscreenButton.addEventListener('click', toggleFullscreen);
 
-        function updateFullscreenButtonText() {
-            if (document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
-            } else {
-                fullscreenButton.textContent = 'Toggle Fullscreen';
-            }
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
         }
-        ['fullscreenchange', 'mozfullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(event => {
-            document.addEventListener(event, updateFullscreenButtonText, false);
-        });
 
-        // --- Settings Modal Logic ---
-        openSettingsButton.addEventListener('click', () => {
-            settingsModal.style.display = 'flex'; 
-        });
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-        closeSettingsButton.addEventListener('click', () => {
-            settingsModal.style.display = 'none';
-        });
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
 
-        window.addEventListener('click', (event) => {
-            if (event.target === settingsModal) {
-                settingsModal.style.display = 'none';
-            }
-        });
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
 
-        // --- Player Name Logic ---
-        setPlayerNameButton.addEventListener('click', () => {
-            let newName = playerNameInput.value.trim();
-            if (newName.length === 0) {
-                newName = 'Player_' + Math.floor(Math.random() * 1000); 
-            }
-            newName = newName.substring(0, 12); 
-            playerNameInput.value = newName; 
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
+        }
 
-            if (localPlayer.id !== newName) {
-                const oldName = localPlayer.id;
-                localPlayer.id = newName; 
-                localStorage.setItem('playerName', newName);
-                showNotification(`Name changed to: ${newName}. Reconnecting...`, 'info');
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
 
-                if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-                    ws.onclose = null; 
-                    ws.close(1000, "User changed name"); 
-                    setTimeout(connectToServer, 100); 
-                } else {
-                    connectToServer(); 
-                }
-            } else {
-                showNotification(`Name is already ${newName}.`, 'info', 1500);
-            }
-        });
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
 
-        // --- Player Color Logic ---
-        setPlayerColorButton.addEventListener('click', () => {
-            let newColor = playerColorInput.value;
-            if (localPlayer.color !== newColor) {
-                const oldColor = localPlayer.color;
-                localPlayer.color = newColor;
-                localStorage.setItem('playerColor', newColor);
-                showNotification(`Your color changed to: ${newColor}. Reconnecting...`, 'info');
+        /* Mobile Controls - Hidden by default, shown by JS */
+        .mobile-controls-container {
+            display: none; /* NEW: Hidden by default */
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+            padding: 10px 0;
+        }
 
-                if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-                    ws.onclose = null; 
-                    ws.close(1000, "User changed color"); 
-                    setTimeout(connectToServer, 100); 
-                } else {
-                    connectToServer(); 
-                }
-            } else {
-                showNotification(`Color is already ${newColor}.`, 'info', 1500);
-            }
-        });
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
 
-        // --- Prevent Page Refresh/Leaving (Optional) ---
-        // window.addEventListener('beforeunload', (event) => {
-        //     event.preventDefault();
-        //     event.returnValue = 'Are you sure you want to leave? Your game progress will be lost.';
-        // });
-    </script>
-</body>
-</html>
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .action-buttons button:active {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+            transform: scale(0.9);
+        }
+        .action-buttons button:hover {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+        }
+
+        /* Modal / Settings Panel */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1001; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.7); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px); /* Frosted glass effect */
+        }
+
+     <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            /* overflow: hidden;  This was removed to allow scrolling */
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .ui-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .panel p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
+
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
+
+        /* Mobile Controls - Hidden by default, shown by JS */
+        .mobile-controls-container {
+            display: none; /* NEW: Hidden by default */
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+            padding: 10px 0;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .action-buttons button:active {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+            transform: scale(0.9);
+        }
+        .action-buttons button:hover {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+        }
+
+        /* Modal / Settings Panel */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1001; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.7); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px); /* Frosted glass effect */
+        }
+
+     <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer 2D Shooter</title>
+    <!-- Google Fonts: Orbitron for game feel, Lato for readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --dark-bg: #1a1a2e;
+            --medium-bg: #2e304a;
+            --light-bg: #444866;
+            --text-color: #e0e0e0;
+            --accent-color-gold: #ffd700;
+            --accent-color-red: #dc3545;
+            --accent-color-green: #28a745;
+            --border-color: #555;
+            --modal-bg: rgba(46, 48, 74, 0.95); /* Semi-transparent medium-bg */
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f0f1c 100%);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            /* overflow: hidden;  This was removed to allow scrolling */
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color-gold);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+
+        canvas {
+            background-color: var(--medium-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            display: block;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .ui-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .panel {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .panel p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .panel kbd {
+            background-color: #555;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #777;
+        }
+
+        /* Buttons & Inputs */
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(180deg, var(--primary-color) 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            vertical-align: middle;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease-in-out;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"], input[type="color"] {
+            background-color: #555;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+            width: 180px;
+            box-sizing: border-box;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .status { color: yellow; }
+        .disconnected { color: var(--accent-color-red); }
+        .connected { color: var(--accent-color-green); }
+
+        /* Notification Area */
+        #notification-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px; /* Slightly wider */
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(0, 0, 0, 0.8); /* Darker, more transparent */
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-out;
+            transform: translateX(100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            font-size: 0.95em;
+            border-left: 5px solid; /* For colored border */
+        }
+        .notification.show { opacity: 1; transform: translateX(0); }
+        .notification.hide { opacity: 0; transform: translateX(100%); }
+        .notification.info { border-color: var(--primary-color); }
+        .notification.success { border-color: var(--accent-color-green); }
+        .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
+        .notification.error { border-color: var(--accent-color-red); }
+
+        /* Mobile Controls - Hidden by default, shown by JS */
+        .mobile-controls-container {
+            display: none; /* NEW: Hidden by default */
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+            padding: 10px 0;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 8px; /* Increased gap */
+            background-color: var(--light-bg);
+            border-radius: 15px; /* More rounded */
+            padding: 15px; /* Increased padding */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .d-pad button {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0056b3 0%, #003f80 100%); /* Darker blue */
+            color: white;
+            border: none;
+            border-radius: 10px; /* More rounded */
+            font-size: 1.5em; /* Larger arrows */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .d-pad button:active {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+            transform: scale(0.9); /* More pronounced press */
+        }
+        .d-pad button:hover {
+            background: linear-gradient(180deg, #003f80 0%, #002a55 100%);
+        }
+        .d-pad .center { visibility: hidden; }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Increased gap */
+            margin-right: 20px;
+        }
+        .action-buttons button {
+            background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
+            color: white;
+            padding: 25px 35px; /* Larger padding */
+            border: none;
+            border-radius: 50%;
+            font-size: 1.8em; /* Larger font */
+            width: 100px; /* Larger button */
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            transition: background-color 0.1s ease, transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .action-buttons button:active {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+            transform: scale(0.9);
+        }
+        .action-buttons button:hover {
+            background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
+        }
+
+        /* Modal / Settings Panel */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1001; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.7); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+            bac
