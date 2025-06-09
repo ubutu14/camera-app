@@ -191,6 +191,38 @@
             vertical-align: middle;
         }
 
+        /* NEW: Slider specific styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 150px;
+            height: 8px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+            border-radius: 5px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        }
+
+
         .status { color: yellow; }
         .disconnected { color: var(--accent-color-red); }
         .connected { color: var(--accent-color-green); }
@@ -231,15 +263,15 @@
         .mobile-controls-container {
             display: none; /* Controlled by JS */
             position: fixed; /* Always relative to viewport */
-            bottom: 20px; /* Distance from bottom */
-            width: calc(100% - 40px); /* Full width minus side padding */
-            left: 20px; /* Align to left */
-            justify-content: space-between; /* Push items to ends */
-            align-items: flex-end; /* Align items to the bottom of the container */
+            bottom: 0; /* Align to very bottom */
+            left: 0; /* Align to very left */
+            width: 100%; /* Full width */
+            height: 100%; /* Full height to allow controls anywhere */
             padding: 0;
             box-sizing: border-box;
-            z-index: 900; /* Ensure it's above canvas */
+            z-index: 900;
             pointer-events: none; /* Allow events to pass through, children will re-enable */
+            /* background-color: rgba(255, 0, 0, 0.1); /* Debugging background, uncomment to see the fixed area */
         }
         .mobile-controls-container > div,
         .mobile-controls-container > button { /* Re-enable pointer events for actual controls */
@@ -248,7 +280,8 @@
 
         /* Joystick Styles */
         #joystick-base {
-            position: relative;
+            position: absolute; /* Relative to mobile-controls-container */
+            /* Initial left/bottom will be set by JS */
             width: 120px; /* Size of the outer circle */
             height: 120px;
             border-radius: 50%;
@@ -261,7 +294,7 @@
         }
 
         #joystick-thumb {
-            position: absolute;
+            position: absolute; /* Relative to joystick-base */
             width: 60px; /* Size of the inner thumbstick */
             height: 60px;
             border-radius: 50%;
@@ -275,13 +308,9 @@
             cursor: grabbing;
         }
 
-        .action-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 20px; /* Increased gap */
-            /* No margin-right needed, space-between handles it */
-        }
-        .action-buttons button {
+        #shootButton { /* Direct child of mobile-controls-container */
+            position: absolute; /* Relative to mobile-controls-container */
+            /* Initial right/bottom will be set by JS */
             background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
             color: white;
             padding: 25px 35px; /* Larger padding */
@@ -298,11 +327,11 @@
             transition: background-color 0.1s ease, transform 0.1s ease;
             -webkit-tap-highlight-color: transparent;
         }
-        .action-buttons button:active {
+        #shootButton:active {
             background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
             transform: scale(0.9);
         }
-        .action-buttons button:hover {
+        #shootButton:hover {
             background: linear-gradient(180deg, #1e7e34 0%, #155b27 100%);
         }
 
@@ -357,6 +386,10 @@
             align-items: center;
             gap: 15px;
             margin-bottom: 20px;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+        }
+        .modal-content .setting-row label {
+            margin-bottom: 0; /* Adjust for inline layout */
         }
 
         .modal-content button {
@@ -483,6 +516,15 @@
             .modal-content { width: 95%; padding: 20px; }
             .modal-content h3 { font-size: 1.5em; }
             .modal-content .setting-row { flex-direction: column; gap: 10px; }
+            /* Mobile controls container height can be adjusted for smaller screens */
+            .mobile-controls-container {
+                /* On smaller screens, allow more vertical space */
+                height: 100%; /* Or a percentage like 70% to allow space for other UI */
+            }
+            /* Joystick and shoot button sizes can also be responsive if needed */
+            #joystick-base { width: 100px; height: 100px; }
+            #joystick-thumb { width: 50px; height: 50px; }
+            #shootButton { width: 80px; height: 80px; font-size: 1.8em; }
         }
     </style>
 </head>
@@ -524,9 +566,8 @@
         <div id="joystick-base">
             <div id="joystick-thumb"></div>
         </div>
-        <div class="action-buttons">
-            <button id="shootButton">X</button> 
-        </div>
+        <!-- Shoot button directly, not wrapped in action-buttons div for simplicity -->
+        <button id="shootButton">X</button> 
     </div>
 
     <!-- Settings Modal -->
@@ -547,7 +588,34 @@
                 <button id="setPlayerColorButton">Set Color</button>
             </div>
 
-            <!-- Future settings could go here -->
+            <!-- NEW: Joystick Position Settings -->
+            <h3>Touch Controls Position</h3>
+            <div class="setting-row">
+                <label for="joystickX">Joystick X:</label>
+                <input type="range" id="joystickX" min="0" max="300" value="20">
+                <span id="joystickXValue">20</span>
+            </div>
+            <div class="setting-row">
+                <label for="joystickY">Joystick Y:</label>
+                <input type="range" id="joystickY" min="0" max="300" value="20">
+                <span id="joystickYValue">20</span>
+            </div>
+
+            <!-- NEW: Shoot Button Position Settings -->
+            <div class="setting-row">
+                <label for="shootButtonX">Shoot Btn X:</label>
+                <input type="range" id="shootButtonX" min="0" max="300" value="20">
+                <span id="shootButtonXValue">20</span>
+            </div>
+            <div class="setting-row">
+                <label for="shootButtonY">Shoot Btn Y:</label>
+                <input type="range" id="shootButtonY" min="0" max="300" value="20">
+                <span id="shootButtonYValue">20</span>
+            </div>
+
+            <button id="saveControlPositionsButton">Save Control Positions</button>
+            <button id="resetControlPositionsButton">Reset Control Defaults</button>
+
             <p style="font-size: 0.9em; color: #aaa;">More settings coming soon!</p>
         </div>
     </div>
@@ -576,6 +644,19 @@
         const joystickBase = document.getElementById('joystick-base');
         const joystickThumb = document.getElementById('joystick-thumb');
         const shootButton = document.getElementById('shootButton');
+
+        // NEW: Control position input elements
+        const joystickXInput = document.getElementById('joystickX');
+        const joystickYInput = document.getElementById('joystickY');
+        const shootButtonXInput = document.getElementById('shootButtonX');
+        const shootButtonYInput = document.getElementById('shootButtonY');
+        const joystickXValueSpan = document.getElementById('joystickXValue');
+        const joystickYValueSpan = document.getElementById('joystickYValue');
+        const shootButtonXValueSpan = document.getElementById('shootButtonXValue');
+        const shootButtonYValueSpan = document.getElementById('shootButtonYValue');
+        const saveControlPositionsButton = document.getElementById('saveControlPositionsButton');
+        const resetControlPositionsButton = document.getElementById('resetControlPositionsButton');
+
 
         const PLAYER_SPEED = 3; 
         const BULLET_SPEED = 10;
@@ -623,6 +704,14 @@
         const joystickMaxRadius = 40; // Max distance thumb can move from center
         let joystickDx = 0;
         let joystickDy = 0;
+
+        // NEW: Default and current control position settings
+        const DEFAULT_CONTROL_POSITIONS = {
+            joystick: { x: 20, y: 20 }, // Offset from left, bottom
+            shootButton: { x: 20, y: 20 } // Offset from right, bottom
+        };
+        let currentControlPositions = JSON.parse(localStorage.getItem('controlPositions')) || DEFAULT_CONTROL_POSITIONS;
+
 
         class Particle {
             constructor(x, y, color, size, speedX, speedY, life) {
@@ -1101,10 +1190,32 @@
         // This will be called once on DOMContentLoaded to set initial state
         function updateMobileControlsVisibility() {
             if (isTouchDevice()) {
-                mobileControlsContainer.style.display = 'flex'; 
+                mobileControlsContainer.style.display = 'block'; // Use block as children are absolute
             } else {
                 mobileControlsContainer.style.display = 'none';
             }
+        }
+
+        // NEW: Function to apply control positions based on currentControlPositions
+        function applyControlPositions() {
+            joystickBase.style.left = `${currentControlPositions.joystick.x}px`;
+            joystickBase.style.bottom = `${currentControlPositions.joystick.y}px`;
+            // For shoot button, we use right offset
+            shootButton.style.right = `${currentControlPositions.shootButton.x}px`; 
+            shootButton.style.bottom = `${currentControlPositions.shootButton.y}px`;
+        }
+
+        // NEW: Function to update settings modal sliders and spans
+        function updateSettingsUI() {
+            joystickXInput.value = currentControlPositions.joystick.x;
+            joystickYInput.value = currentControlPositions.joystick.y;
+            shootButtonXInput.value = currentControlPositions.shootButton.x;
+            shootButtonYInput.value = currentControlPositions.shootButton.y;
+
+            joystickXValueSpan.textContent = currentControlPositions.joystick.x;
+            joystickYValueSpan.textContent = currentControlPositions.joystick.y;
+            shootButtonXValueSpan.textContent = currentControlPositions.shootButton.x;
+            shootButtonYValueSpan.textContent = currentControlPositions.shootButton.y;
         }
 
         // --- Input Handling (Keyboard) ---
@@ -1304,6 +1415,7 @@
 
         // --- Settings Modal Logic ---
         openSettingsButton.addEventListener('click', () => {
+            updateSettingsUI(); // Load current values into sliders when opening
             settingsModal.style.display = 'flex'; 
         });
 
@@ -1316,6 +1428,42 @@
                 settingsModal.style.display = 'none';
             }
         });
+
+        // NEW: Event listeners for control position sliders
+        joystickXInput.addEventListener('input', (e) => {
+            currentControlPositions.joystick.x = parseInt(e.target.value);
+            joystickXValueSpan.textContent = e.target.value;
+            applyControlPositions();
+        });
+        joystickYInput.addEventListener('input', (e) => {
+            currentControlPositions.joystick.y = parseInt(e.target.value);
+            joystickYValueSpan.textContent = e.target.value;
+            applyControlPositions();
+        });
+        shootButtonXInput.addEventListener('input', (e) => {
+            currentControlPositions.shootButton.x = parseInt(e.target.value);
+            shootButtonXValueSpan.textContent = e.target.value;
+            applyControlPositions();
+        });
+        shootButtonYInput.addEventListener('input', (e) => {
+            currentControlPositions.shootButton.y = parseInt(e.target.value);
+            shootButtonYValueSpan.textContent = e.target.value;
+            applyControlPositions();
+        });
+
+        saveControlPositionsButton.addEventListener('click', () => {
+            localStorage.setItem('controlPositions', JSON.stringify(currentControlPositions));
+            showNotification('Control positions saved!', 'success', 2000);
+        });
+
+        resetControlPositionsButton.addEventListener('click', () => {
+            localStorage.removeItem('controlPositions');
+            currentControlPositions = { ...DEFAULT_CONTROL_POSITIONS }; // Reset to a copy of defaults
+            applyControlPositions();
+            updateSettingsUI(); // Update sliders to reflect default values
+            showNotification('Control positions reset to defaults!', 'info', 2000);
+        });
+
 
         // --- Player Name Logic ---
         setPlayerNameButton.addEventListener('click', () => {
@@ -1365,7 +1513,13 @@
             }
         });
 
-        document.addEventListener('DOMContentLoaded', updateMobileControlsVisibility);
+        // Initial setup on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateMobileControlsVisibility(); // Set visibility based on device
+            applyControlPositions(); // Apply saved or default positions
+            updateSettingsUI(); // Initialize settings UI with current values
+            connectToServer(); // Connect to game server
+        });
 
         // --- Prevent Page Refresh/Leaving (Optional) ---
         // window.addEventListener('beforeunload', (event) => {
