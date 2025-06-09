@@ -1,5 +1,3 @@
-// server.js (The complete and correct version for your game)
-
 const WebSocket = require('ws');
 const http = require('http');
 
@@ -22,6 +20,10 @@ const PLAYER_RADIUS = 15;
 const BULLET_RADIUS = 3;
 const BULLET_LIFETIME = 60; // frames (adjust if your client's bullet lifetime is different)
 const MAX_HEALTH = 100;
+
+// --- NEW: Health Upgrade Settings ---
+const HEALTH_UPGRADE_SCORE_THRESHOLD = 200; // Score required to get a health upgrade
+const HEALTH_UPGRADE_AMOUNT = 50; // Amount of health added on upgrade
 
 let nextBulletId = 0; // Simple ID counter for bullets
 
@@ -51,7 +53,8 @@ wss.on('connection', ws => {
                         y: parsedMessage.player.y,
                         color: parsedMessage.player.color,
                         health: MAX_HEALTH, // Always start with full health on server
-                        score: 0
+                        score: 0,
+                        hasUpgradedHealth: false // NEW: Track if player has received health upgrade
                     };
                     console.log(`Player ${playerId} joined.`);
                     // Send back the confirmed player ID to the client if it was adjusted
@@ -163,7 +166,27 @@ setInterval(() => {
 
                 // Award score to the shooter
                 if (players[bullet.ownerId]) {
-                    players[bullet.ownerId].score += 10;
+                    const shooter = players[bullet.ownerId];
+                    shooter.score += 10;
+
+                    // NEW: Check for health upgrade after score increase
+                    if (shooter.score >= HEALTH_UPGRADE_SCORE_THRESHOLD && !shooter.hasUpgradedHealth) {
+                        shooter.health += HEALTH_UPGRADE_AMOUNT; // Increase current health
+                        shooter.hasUpgradedHealth = true; // Mark as upgraded
+                        console.log(`Player ${shooter.id} reached ${shooter.score} score and upgraded health to ${shooter.health}!`);
+                        
+                        // Notify clients about the upgrade
+                        wss.clients.forEach(clientWs => {
+                            if (clientWs.readyState === WebSocket.OPEN) {
+                                clientWs.send(JSON.stringify({
+                                    type: 'player_upgraded_health',
+                                    id: shooter.id,
+                                    newHealth: shooter.health,
+                                    score: shooter.score
+                                }));
+                            }
+                        });
+                    }
                 }
 
                 // Send a specific 'player_hit' message to all clients for immediate hit markers/feedback
@@ -188,7 +211,7 @@ setInterval(() => {
                 if (player.health <= 0) {
                     console.log(`Player ${player.id} defeated!`);
                     // Reset player health and respawn them
-                    player.health = MAX_HEALTH;
+                    player.health = MAX_HEALTH; // Respawn with base MAX_HEALTH
                     player.x = Math.random() * 800; // Respawn at random location
                     player.y = Math.random() * 600;
                     // You could also broadcast a 'player_defeated' message here if you want specific handling
