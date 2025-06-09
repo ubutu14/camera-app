@@ -291,10 +291,6 @@
         const PLAYER_HIT_FLASH_DURATION = 10; // frames
         const NOTIFICATION_DISPLAY_TIME = 3000; // ms
 
-        // Reconciliation and Interpolation Factors
-        const RECONCILIATION_FACTOR = 0.2; // How quickly local player corrects to server position
-        const INTERPOLATION_SPEED = 0.15; // How quickly other players interpolate to new positions
-
         let defaultPlayerName = localStorage.getItem('playerName') || 'Player_' + Math.floor(Math.random() * 1000);
         playerNameInput.value = defaultPlayerName;
 
@@ -308,12 +304,7 @@
             lastShotTime: 0,
             shootCooldown: 200,
             muzzleFlashTimer: 0,
-            hitFlashTimer: 0,
-            // New properties for reconciliation
-            targetX: canvas.width / 2,
-            targetY: canvas.height / 2,
-            inputSequence: 0, // 客户端的输入序列号
-            pendingInputs: [] // 存储待服务器确认的输入
+            hitFlashTimer: 0
         };
 
         let otherPlayers = {};
@@ -396,148 +387,83 @@
                         const currentPlayersIds = Object.keys(otherPlayers);
                         const newPlayersIds = Object.keys(message.players || {});
 
-                        // Handle players joining
                         for (const newId of newPlayersIds) {
                             if (newId !== localPlayer.id && !currentPlayersIds.includes(newId) && message.players[newId]) {
                                 showNotification(`${message.players[newId].id} joined the game.`, 'info');
-                                // Initialize interpolation properties for new players
-                                message.players[newId]._prevX = message.players[newId].x;
-                                message.players[newId]._prevY = message.players[newId].y;
-                                message.players[newId]._targetX = message.players[newId].x;
-                                message.players[newId]._targetY = message.players[newId].y;
-                                message.players[newId]._interpolationAlpha = 0; // Start at 0, will increment to 1
-                                message.players[newId]._prevHealth = message.players[newId].health; // Initialize health tracking
+                                message.players[newId]._prevHealth = message.players[newId].health;
                             }
                         }
 
-                        // Handle players leaving
                         for (const oldId of currentPlayersIds) {
                             if (oldId !== localPlayer.id && !newPlayersIds.includes(oldId)) {
                                 showNotification(`${otherPlayers[oldId].id} left the game.`, 'warning');
                             }
                         }
 
-                        // Update local player state from server (for reconciliation)
-                        if (message.players[localPlayer.id]) {
-                            const serverLocalPlayer = message.players[localPlayer.id];
+                        otherPlayers = message.players || {};
+                        bullets = message.bullets || [];
 
-                            // Update health and score directly as they are not predicted by movement
-                            if (localPlayer.health !== serverLocalPlayer.health) {
-                                if (localPlayer.health > serverLocalPlayer.health) {
+                        // IMPORTANT: For localPlayer, update its position directly from server
+                        // This is the "server authoritative" update that corrects client-side prediction
+                        if (otherPlayers[localPlayer.id]) {
+                            localPlayer.x = otherPlayers[localPlayer.id].x;
+                            localPlayer.y = otherPlayers[localPlayer.id].y;
+                            if (localPlayer.health !== otherPlayers[localPlayer.id].health) {
+                                if (localPlayer.health > otherPlayers[localPlayer.id].health) {
                                     localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
                                     createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
                                 }
-                                localPlayer.health = serverLocalPlayer.health;
+                                localPlayer.health = otherPlayers[localPlayer.id].health;
                             }
-                            localPlayer.score = serverLocalPlayer.score;
-
-                            // *** Reconciliation: Re-simulate unacknowledged inputs ***
-                            // Remove inputs that the server has already processed
-                            localPlayer.pendingInputs = localPlayer.pendingInputs.filter(input => 
-                                input.sequence > serverLocalPlayer.lastProcessedInputSequence
-                            );
-
-                            // Calculate the reconciled predicted position
-                            // Start with server's authoritative position
-                            let reconciledPredictedX = serverLocalPlayer.x;
-                            let reconciledPredictedY = serverLocalPlayer.y;
-
-                            // Re-apply all pending (unacknowledged) inputs to this calculated position
-                            localPlayer.pendingInputs.forEach(input => {
-                                let reSimDx = 0;
-                                let reSimDy = 0;
-                                if (input.inputState.up) reSimDy -= PLAYER_SPEED;
-                                if (input.inputState.down) reSimDy += PLAYER_SPEED;
-                                if (input.inputState.left) reSimDx -= PLAYER_SPEED;
-                                if (input.inputState.right) reSimDx += PLAYER_SPEED;
-
-                                reconciledPredictedX += reSimDx;
-                                reconciledPredictedY += reSimDy;
-                                // Re-clamp re-simulated position
-                                reconciledPredictedX = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, reconciledPredictedX));
-                                reconciledPredictedY = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, reconciledPredictedY));
-                            });
-
-                            // Set the target for reconciliation to this calculated reconciled predicted position
-                            // localPlayer.x and localPlayer.y will then smoothly move towards this target in the update loop
-                            localPlayer.targetX = reconciledPredictedX;
-                            localPlayer.targetY = reconciledPredictedY;
+                            localPlayer.score = otherPlayers[localPlayer.id].score;
+                            delete otherPlayers[localPlayer.id]; // Remove local player from otherPlayers list
                         }
 
-                        // Update other players' states for interpolation
-                        for (const id in message.players) {
-                            if (id === localPlayer.id) continue; // Skip local player
+                        // For other players, update their health and flash timer
+                        for (const id in otherPlayers) {
+                            if (otherPlayers[id]._prevHealth === undefined) {
+                                otherPlayers[id]._prevHealth = otherPlayers[id].health;
+                            }
 
-                            const serverPlayer = message.players[id];
-                            if (otherPlayers[id]) {
-                                // Existing player: Set previous position to current, and target to new server position
-                                otherPlayers[id]._prevX = otherPlayers[id].x;
-                                otherPlayers[id]._prevY = otherPlayers[id].y;
-                                otherPlayers[id]._targetX = serverPlayer.x;
-                                otherPlayers[id]._targetY = serverPlayer.y;
-                                otherPlayers[id]._interpolationAlpha = 0; // Reset interpolation progress
-
-                                // Update other properties (health, score, color)
-                                if (otherPlayers[id].health !== serverPlayer.health) {
-                                    if (otherPlayers[id].health > serverPlayer.health) {
-                                        otherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                                        createImpactParticles(otherPlayers[id].x, otherPlayers[id].y, otherPlayers[id].color);
-                                        if (serverPlayer.health <= 0) {
-                                            showNotification(`${serverPlayer.id} was defeated!`, 'error');
-                                        } else {
-                                            showNotification(`${serverPlayer.id} was hit!`, 'warning', 1500);
-                                        }
+                            if (otherPlayers[id].health !== otherPlayers[id]._prevHealth) {
+                                if (otherPlayers[id].health < otherPlayers[id]._prevHealth) {
+                                    otherPlayers[id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                                    createImpactParticles(otherPlayers[id].x, otherPlayers[id].y, otherPlayers[id].color);
+                                    if (otherPlayers[id].health <= 0) {
+                                        showNotification(`${otherPlayers[id].id} was defeated!`, 'error');
+                                    } else {
+                                        showNotification(`${otherPlayers[id].id} was hit!`, 'warning', 1500);
                                     }
                                 }
-                                otherPlayers[id].health = serverPlayer.health;
-                                otherPlayers[id].score = serverPlayer.score;
-                                otherPlayers[id].color = serverPlayer.color;
-                            } else {
-                                // New player: Add to otherPlayers with initial interpolation data
-                                otherPlayers[id] = {
-                                    ...serverPlayer,
-                                    _prevX: serverPlayer.x,
-                                    _prevY: serverPlayer.y,
-                                    _targetX: serverPlayer.x,
-                                    _targetY: serverPlayer.y,
-                                    _interpolationAlpha: 0,
-                                    _prevHealth: serverPlayer.health
-                                };
                             }
+                            otherPlayers[id]._prevHealth = otherPlayers[id].health;
                         }
-
-                        // Remove players that are no longer in the server update
-                        for (const id in otherPlayers) {
-                            if (id === localPlayer.id) continue; // Skip local player
-                            if (!message.players[id]) {
-                                delete otherPlayers[id];
-                            }
-                        }
-                        
-                        bullets = message.bullets || [];
                         break;
-
                     case 'player_hit':
-                        // This message directly updates player health and triggers effects,
-                        // overriding the game_state_update for immediate feedback on hits.
-                        const hitPlayer = (message.id === localPlayer.id) ? localPlayer : otherPlayers[message.id];
-                        if (hitPlayer) {
-                            hitPlayer.health = message.newHealth;
-                            hitPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
-                            createImpactParticles(hitPlayer.x, hitPlayer.y, hitPlayer.color);
-                            console.log(`Player ${hitPlayer.id} hit! Health: ${hitPlayer.health}`);
+                        if (message.id === localPlayer.id) {
+                            localPlayer.health = message.newHealth;
+                            localPlayer.hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                            createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color);
+                            console.log(`Local player hit! Health: ${localPlayer.health}`);
                             if (message.newHealth <= 0) {
-                                showNotification(`${hitPlayer.id === localPlayer.id ? 'You' : hitPlayer.id} were defeated!`, 'error');
+                                showNotification(`You were defeated!`, 'error');
                             } else {
-                                showNotification(`${hitPlayer.id === localPlayer.id ? 'You' : hitPlayer.id} were hit!`, 'warning', 1500);
+                                showNotification(`You were hit!`, 'warning', 1500);
+                            }
+                        } else if (otherPlayers[message.id]) {
+                            otherPlayers[message.id].health = message.newHealth;
+                            otherPlayers[message.id].hitFlashTimer = PLAYER_HIT_FLASH_DURATION;
+                            createImpactParticles(otherPlayers[message.id].x, otherPlayers[message.id].y, otherPlayers[message.id].color);
+                            if (message.newHealth <= 0) {
+                                showNotification(`${otherPlayers[message.id].id} was defeated!`, 'error');
+                            } else {
+                                showNotification(`${otherPlayers[message.id].id} was hit!`, 'warning', 1500);
                             }
                         }
-                        // Corrected: Use message.hitY instead of message.y
                         if (message.hitX && message.hitY) {
                             hitMarkers.push({ x: message.hitX, y: message.hitY, timer: HIT_MARKER_DURATION });
                         }
                         break;
-
                     case 'player_disconnected':
                         if (message.id && otherPlayers[message.id]) {
                             showNotification(`${otherPlayers[message.id].id} left the game.`, 'warning');
@@ -545,30 +471,8 @@
                         }
                         break;
                     case 'player_joined':
-                        // This case is largely redundant now that game_state_update handles joins,
-                        // but can be kept for immediate notification if desired.
-                        if (message.player && message.player.id !== localPlayer.id && !otherPlayers[message.player.id]) {
+                        if (message.player && message.player.id !== localPlayer.id) {
                             showNotification(`${message.player.id} joined the game.`, 'info');
-                            // Add initial interpolation data for newly joined player
-                            otherPlayers[message.player.id] = {
-                                ...message.player,
-                                _prevX: message.player.x,
-                                _prevY: message.player.y,
-                                _targetX: message.player.x,
-                                _targetY: message.player.y,
-                                _interpolationAlpha: 0,
-                                _prevHealth: message.player.health
-                            };
-                        }
-                        break;
-                    case 'player_id_confirmed':
-                        // If the server assigned a different ID (e.g., if original was taken)
-                        if (localPlayer.id !== message.id) {
-                            console.log(`Server confirmed new player ID: ${message.id}`);
-                            localPlayer.id = message.id;
-                            localStorage.setItem('playerName', message.id); // Update local storage
-                            playerNameInput.value = message.id; // Update input field
-                            showNotification(`Your ID was adjusted to: ${message.id}`, 'info');
                         }
                         break;
                 }
@@ -606,96 +510,45 @@
                 const speedY = Math.sin(angle) * speed;
                 const size = Math.random() * 2 + 1;
                 const life = Math.random() * 30 + 20;
-                // Parse HSL color to RGB for particle color adjustment
-                let r, g, b;
-                const hslMatch = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-                if (hslMatch) {
-                    const h = parseInt(hslMatch[1]);
-                    const s = parseInt(hslMatch[2]) / 100;
-                    const l = parseInt(hslMatch[3]) / 100;
-
-                    const c = (1 - Math.abs(2 * l - 1)) * s;
-                    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-                    const m = l - c / 2;
-
-                    if (0 <= h && h < 60) {
-                        r = c; g = x; b = 0;
-                    } else if (60 <= h && h < 120) {
-                        r = x; g = c; b = 0;
-                    } else if (120 <= h && h < 180) {
-                        r = 0; g = c; b = x;
-                    } else if (180 <= h && h < 240) {
-                        r = 0; g = x; b = c;
-                    } else if (240 <= h && h < 300) {
-                        r = x; g = 0; b = c;
-                    } else if (300 <= h && h < 360) {
-                        r = c; g = 0; b = x;
-                    }
-                    r = Math.round((r + m) * 255);
-                    g = Math.round((g + m) * 255);
-                    b = Math.round((b + m) * 255);
-                } else {
-                    // Fallback for non-HSL colors or if parsing fails
-                    r = 255; g = 255; b = 255;
-                }
-
-                const particleColor = `rgba(${Math.min(255, r + Math.floor(Math.random()*50))}, ${Math.min(255, g + Math.floor(Math.random()*50))}, ${Math.min(255, b + Math.floor(Math.random()*50))}, 1)`;
+                const r = parseInt(baseColor.substring(4, 7));
+                const g = parseInt(baseColor.substring(8, 11));
+                const b = parseInt(baseColor.substring(12, 15));
+                const particleColor = `rgba(${r + Math.floor(Math.random()*50)}, ${g + Math.floor(Math.random()*50)}, ${b + Math.floor(Math.random()*50)}, 1)`;
                 particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
             }
         }
 
         function update() {
-            let currentInputState = {
-                up: keys['arrowup'] || keys['w'],
-                down: keys['arrowdown'] || keys['s'],
-                left: keys['arrowleft'] || keys['a'],
-                right: keys['arrowright'] || keys['d']
-            };
+            let movedX = 0;
+            let movedY = 0;
 
-            let dx = 0;
-            let dy = 0;
-
-            // Calculate desired movement based on current input state
-            if (currentInputState.up) {
-                dy -= PLAYER_SPEED;
+            // This is the client-side prediction logic
+            if (keys['arrowup'] || keys['w']) {
+                localPlayer.y -= PLAYER_SPEED;
+                movedY = -PLAYER_SPEED; // Indicate movement for sending to server
             }
-            if (currentInputState.down) {
-                dy += PLAYER_SPEED;
+            if (keys['arrowdown'] || keys['s']) {
+                localPlayer.y += PLAYER_SPEED;
+                movedY = PLAYER_SPEED; // Indicate movement for sending to server
             }
-            if (currentInputState.left) {
-                dx -= PLAYER_SPEED;
+            if (keys['arrowleft'] || keys['a']) {
+                localPlayer.x -= PLAYER_SPEED;
+                movedX = -PLAYER_SPEED; // Indicate movement for sending to server
             }
-            if (currentInputState.right) {
-                dx += PLAYER_SPEED;
+            if (keys['arrowright'] || keys['d']) {
+                localPlayer.x += PLAYER_SPEED;
+                movedX = PLAYER_SPEED; // Indicate movement for sending to server
             }
 
-            // Client-side prediction: immediately apply movement
-            localPlayer.x += dx;
-            localPlayer.y += dy;
-
-            // Clamp local player predicted position to canvas bounds
+            // Clamp local player position to canvas bounds
             localPlayer.x = Math.max(PLAYER_RADIUS, Math.min(canvas.width - PLAYER_RADIUS, localPlayer.x));
             localPlayer.y = Math.max(PLAYER_RADIUS, Math.min(canvas.height - PLAYER_RADIUS, localPlayer.y));
 
-            // Server reconciliation: gently adjust local player position towards the server's authoritative position
-            // This happens AFTER re-simulating pending inputs (which is handled in onmessage now)
-            if (localPlayer.targetX !== undefined && localPlayer.targetY !== undefined) {
-                localPlayer.x += (localPlayer.targetX - localPlayer.x) * RECONCILIATION_FACTOR;
-                localPlayer.y += (localPlayer.targetY - localPlayer.y) * RECONCILIATION_FACTOR;
-            }
-
-            // Send movement input (full input state and sequence) to the server
-            // Only send if there's actual movement or input state has changed
-            // For simplicity, we send every frame if any key is pressed, or if there were pending inputs.
-            // A more advanced approach would only send on input change or at fixed intervals.
-            if (ws && ws.readyState === WebSocket.OPEN && (dx !== 0 || dy !== 0 || localPlayer.pendingInputs.length > 0)) {
-                localPlayer.inputSequence++; // Increment sequence for this input
-                const inputPacket = {
-                    sequence: localPlayer.inputSequence,
-                    inputState: currentInputState
-                };
-                localPlayer.pendingInputs.push(inputPacket); // Store this input for future reconciliation
-                ws.send(JSON.stringify({ type: 'player_input', sequence: inputPacket.sequence, inputState: inputPacket.inputState }));
+            // Send movement to server if character moved
+            // Note: This sends absolute position (x,y) if server is set up to receive 'player_move'
+            // If your server expects 'player_input' with dx, dy, this will need to change.
+            if (ws && ws.readyState === WebSocket.OPEN && (movedX !== 0 || movedY !== 0)) {
+                ws.send(JSON.stringify({ type: 'player_move', id: localPlayer.id, x: localPlayer.x, y: localPlayer.y }));
             }
 
             if (keys[' '] && (Date.now() - localPlayer.lastShotTime > localPlayer.shootCooldown)) {
@@ -703,23 +556,13 @@
 
                 createMuzzleFlash(localPlayer.x, localPlayer.y, localPlayer.color);
 
-                // Determine bullet direction (e.g., always shoot up, or towards mouse/touch if implemented)
-                // For this example, it remains shooting upwards
-                let bulletDirX = 0;
-                let bulletDirY = -1; 
-                // You might add logic here to aim towards mouse position if applicable for desktop
-                // const mouseX = ...; const mouseY = ...;
-                // const angle = Math.atan2(mouseY - localPlayer.y, mouseX - localPlayer.x);
-                // bulletDirX = Math.cos(angle); bulletDirY = Math.sin(angle);
-
-
                 // Send shoot action to server
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'player_shoot', bulletDirX: bulletDirX, bulletDirY: bulletDirY }));
+                    ws.send(JSON.stringify({ type: 'player_shoot', id: localPlayer.id, bulletDirX: 0, bulletDirY: -1 })); // Always shoot up for now
                 }
             }
 
-            // Update bullets (client-side prediction - though server will correct)
+            // Update bullets (client-side prediction)
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.x += bullet.dirX * BULLET_SPEED;
@@ -730,18 +573,6 @@
                     bullet.x < 0 || bullet.x > canvas.width ||
                     bullet.y < 0 || bullet.y > canvas.height) {
                     bullets.splice(i, 1);
-                }
-            }
-
-            // Update other players' positions using interpolation
-            for (const id in otherPlayers) {
-                const player = otherPlayers[id];
-                if (player._targetX !== undefined && player._targetY !== undefined) {
-                    // Increment alpha towards 1
-                    player._interpolationAlpha = Math.min(1, player._interpolationAlpha + INTERPOLATION_SPEED);
-                    // Interpolate position
-                    player.x = player._prevX + (player._targetX - player._prevX) * player._interpolationAlpha;
-                    player.y = player._prevY + (player._targetY - player._prevY) * player._interpolationAlpha;
                 }
             }
 
