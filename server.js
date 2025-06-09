@@ -1,15 +1,4 @@
-// server.js (The complete and correct version for your game)
-
-const WebSocket = require('ws');
-const http = require('http');
-
-const server = http.createServer((req, res) => {
-    // A simple HTTP response for health checks or if someone tries to browse directly
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Multiplayer Game Server is Running!');
-});
-
-const wss = new WebSocket.Server({ server });
+// ... (之前的代码)
 
 const players = {}; // Stores all connected players' states
 const bullets = {}; // Stores all active bullets' states
@@ -71,18 +60,12 @@ wss.on('connection', ws => {
                 case 'player_input':
                     if (playerId && players[playerId]) {
                         const player = players[playerId];
-                        const inputState = parsedMessage.inputState; // 接收完整的输入状态
-                        const sequence = parsedMessage.sequence;       // 接收序列号
+                        const inputState = parsedMessage.inputState; // 新增: 接收完整的输入状态
+                        const sequence = parsedMessage.sequence;       // 新增: 接收序列号
 
-                        // 仅当接收到的序列号大于当前服务器已处理的序列号时才更新
-                        // 这样可以避免乱序或重复处理旧的输入
-                        if (sequence > player.lastProcessedInputSequence) {
-                            player.lastProcessedInputSequence = sequence;
-                            player.inputState = inputState; // 存储最新输入状态，在游戏循环中处理
-                        }
-                        // else {
-                        //     console.log(`Server: Received old/duplicate input for ${playerId}, seq: ${sequence}, current: ${player.lastProcessedInputSequence}`);
-                        // }
+                        // 更新玩家的最新处理输入序列号和输入状态
+                        player.lastProcessedInputSequence = sequence;
+                        player.inputState = inputState; // 存储最新输入状态，在游戏循环中处理
                     }
                     break;
 
@@ -142,13 +125,12 @@ setInterval(() => {
         let dx = 0;
         let dy = 0;
 
-        // 根据最新接收到的输入状态计算移动
         if (inputState.up) dy -= PLAYER_SPEED;
         if (inputState.down) dy += PLAYER_SPEED;
         if (inputState.left) dx -= PLAYER_SPEED;
         if (inputState.right) dx += PLAYER_SPEED;
 
-        // 应用移动
+        // Apply movement
         player.x += dx;
         player.y += dy;
 
