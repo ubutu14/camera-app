@@ -42,6 +42,14 @@
             touch-action: manipulation;
         }
 
+        /* NEW: Body Fullscreen adjustments */
+        html:-webkit-full-screen,
+        html:-moz-full-screen,
+        html:-ms-full-screen,
+        html:fullscreen {
+            overflow: hidden; /* Prevent scrolling in fullscreen */
+        }
+
         h1 {
             font-family: 'Orbitron', sans-serif;
             color: var(--accent-color-gold);
@@ -50,14 +58,46 @@
             font-size: 2.5em;
         }
 
+        /* REVERTED: Canvas styles back to original */
         canvas {
             background-color: var(--medium-bg);
             border: 3px solid var(--border-color);
             box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
             display: block;
-            margin-bottom: 20px;
+            margin-bottom: 20px; /* Keep margin-bottom here */
             border-radius: 8px;
         }
+
+        /* Removed fullscreen styles from #game-area-wrapper */
+        #game-area-wrapper {
+            /* This wrapper is now mostly for consistent sizing/centering, not fullscreen */
+            position: relative; /* Still good for any absolute children if we add them later */
+            width: 800px; /* Original width */
+            height: 600px; /* Original height */
+            display: flex; /* To center canvas if it were smaller */
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Hide anything that goes outside */
+            /* Removed border, shadow, background, radius from here */
+            /* Removed margin-bottom from here, it's back on canvas */
+        }
+
+        /* Canvas scaling when the *HTML* element is fullscreen */
+        html:fullscreen #gameCanvas,
+        html:-webkit-full-screen #gameCanvas,
+        html:-moz-full-screen #gameCanvas,
+        html:-ms-full-screen #gameCanvas {
+            max-width: 100vw; /* Max width of viewport */
+            max-height: 100vh; /* Max height of viewport */
+            width: auto;
+            height: auto;
+            object-fit: contain; /* Maintain aspect ratio */
+            margin: auto; /* Center it in fullscreen */
+            position: absolute; /* Position relative to fullscreen body */
+            top: 0; bottom: 0; left: 0; right: 0;
+            background-color: var(--medium-bg); /* Ensure background is still there */
+        }
+
 
         .ui-container {
             display: flex;
@@ -187,10 +227,10 @@
         .notification.warning { border-color: #ffc107; } /* Yellowish-orange */
         .notification.error { border-color: var(--accent-color-red); }
 
-        /* Mobile Controls Container - Fixed at bottom */
+        /* Mobile Controls Container - Fixed at bottom of viewport */
         .mobile-controls-container {
             display: none; /* Controlled by JS */
-            position: fixed; /* Position relative to viewport */
+            position: fixed; /* Always relative to viewport */
             bottom: 20px; /* Distance from bottom */
             width: calc(100% - 40px); /* Full width minus side padding */
             left: 20px; /* Align to left */
@@ -198,7 +238,7 @@
             align-items: flex-end; /* Align items to the bottom of the container */
             padding: 0;
             box-sizing: border-box;
-            z-index: 900; /* Ensure it's above canvas but below modals */
+            z-index: 900; /* Ensure it's above canvas */
             pointer-events: none; /* Allow events to pass through, children will re-enable */
         }
         .mobile-controls-container > div,
@@ -436,8 +476,7 @@
         /* Responsive adjustments */
         @media (max-width: 768px) {
             h1 { font-size: 2em; }
-            canvas { width: 100%; height: auto; } /* Allow canvas to scale */
-            /* Mobile controls container already handles fixed positioning */
+            /* #game-area-wrapper will handle canvas scaling */
             #scoreboard { top: 10px; left: 10px; width: 180px; }
             #notification-area { top: 10px; right: 10px; width: 220px; }
             .panel { padding: 15px; }
@@ -464,16 +503,9 @@
             <button id="fullscreenButton">Toggle Fullscreen</button>
         </div>
     
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-    
-        <!-- Mobile Controls (Joystick and Shoot Button) -->
-        <div class="mobile-controls-container">
-            <div id="joystick-base">
-                <div id="joystick-thumb"></div>
-            </div>
-            <div class="action-buttons">
-                <button id="shootButton">X</button> 
-            </div>
+        <!-- Game Canvas Area - kept for consistent sizing/centering and aspect ratio -->
+        <div id="game-area-wrapper">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
     
         <div class="info-panel panel">
@@ -484,6 +516,16 @@
                 <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen Joystick**
                 <br>Shoot: <kbd>Spacebar</kbd> / **On-screen <kbd>X</kbd> button**
             </p>
+        </div>
+    </div>
+
+    <!-- Mobile Controls (Joystick and Shoot Button) - NOW A DIRECT CHILD OF BODY -->
+    <div class="mobile-controls-container">
+        <div id="joystick-base">
+            <div id="joystick-thumb"></div>
+        </div>
+        <div class="action-buttons">
+            <button id="shootButton">X</button> 
         </div>
     </div>
 
@@ -524,6 +566,10 @@
         const openSettingsButton = document.getElementById('openSettingsButton'); 
         const closeSettingsButton = document.getElementById('closeSettingsButton'); 
         const playerScoresList = document.getElementById('playerScoresList'); 
+
+        // Reference to the new wrapper for canvas
+        const gameAreaWrapper = document.getElementById('game-area-wrapper');
+        // Mobile controls container (now a direct child of body)
         const mobileControlsContainer = document.querySelector('.mobile-controls-container'); 
 
         // Joystick elements
@@ -573,8 +619,7 @@
 
         // Joystick state
         let joystickActive = false;
-        let joystickCenterX = 0;
-        let joystickCenterY = 0;
+        let joystickTouchIdentifier = null; // To track multi-touch
         const joystickMaxRadius = 40; // Max distance thumb can move from center
         let joystickDx = 0;
         let joystickDy = 0;
@@ -848,10 +893,11 @@
             let dx = 0; 
             let dy = 0; 
 
+            // Only use joystick input if on a touch device and joystick is active
             if (isTouchDevice() && joystickActive) {
                 dx = joystickDx * PLAYER_SPEED;
                 dy = joystickDy * PLAYER_SPEED;
-            } else { // Keyboard input for non-touch or when joystick is not active
+            } else { // Use keyboard input for non-touch devices or when joystick isn't active
                 if (keys['arrowup'] || keys['w']) { dy -= PLAYER_SPEED; }
                 if (keys['arrowdown'] || keys['s']) { dy += PLAYER_SPEED; }
                 if (keys['arrowleft'] || keys['a']) { dx -= PLAYER_SPEED; }
@@ -1052,6 +1098,7 @@
         }
 
         // Function to update the visibility of mobile controls
+        // This will be called once on DOMContentLoaded to set initial state
         function updateMobileControlsVisibility() {
             if (isTouchDevice()) {
                 mobileControlsContainer.style.display = 'flex'; 
@@ -1062,8 +1109,8 @@
 
         // --- Input Handling (Keyboard) ---
         window.addEventListener('keydown', (e) => {
-            // Only process keyboard if not on a touch device or if joystick is not active
-            if (!isTouchDevice() || !joystickActive) {
+            // Only process keyboard if not on a touch device
+            if (!isTouchDevice()) {
                 const key = e.key.toLowerCase();
                 keys[key] = true;
                 if (key === ' ' || key.startsWith('arrow') || ['w', 'a', 's', 'd'].includes(key)) {
@@ -1073,36 +1120,47 @@
         });
 
         window.addEventListener('keyup', (e) => {
-            if (!isTouchDevice() || !joystickActive) { // Only process keyboard if not on a touch device or if joystick is not active
+            if (!isTouchDevice()) { // Only process keyboard if not on a touch device
                 keys[e.key.toLowerCase()] = false;
             }
         });
 
         // --- Joystick Input Handling ---
-        const getTouchPos = (e) => {
-            const rect = joystickBase.getBoundingClientRect();
-            const clientX = e.clientX || e.touches[0].clientX;
-            const clientY = e.clientY || e.touches[0].clientY;
-            return {
-                x: clientX - rect.left - rect.width / 2,
-                y: clientY - rect.top - rect.height / 2
-            };
+        const getTouchOrMousePos = (e) => {
+            const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+            return { clientX, clientY };
         };
 
         const handleJoystickStart = (e) => {
             if (!isTouchDevice()) return; // Only for touch devices
+
+            // Prevent multiple touches from activating multiple joysticks or conflicting
+            if (e.type === 'touchstart' && e.touches.length > 1) {
+                return; 
+            }
+
+            // If a touch is already being tracked, ignore new touches
+            if (joystickActive && joystickTouchIdentifier !== null) {
+                return;
+            }
+
             e.preventDefault();
             joystickActive = true;
             joystickThumb.classList.add('active'); // Add active class for styling
             joystickThumb.style.transition = 'none'; // Disable transition during drag
 
-            const pos = getTouchPos(e);
-            joystickCenterX = pos.x; // Center of the joystick movement relative to base
-            joystickCenterY = pos.y; 
+            if (e.touches && e.touches.length > 0) {
+                joystickTouchIdentifier = e.touches[0].identifier; // Track the specific touch
+            }
 
-            // Initial thumb position should be where the touch started
-            let x = pos.x;
-            let y = pos.y;
+            const baseRect = joystickBase.getBoundingClientRect();
+            const startPos = getTouchOrMousePos(e);
+            
+            // Calculate initial position relative to joystickBase center
+            let x = startPos.clientX - baseRect.left - baseRect.width / 2;
+            let y = startPos.clientY - baseRect.top - baseRect.height / 2;
+
             const distance = Math.sqrt(x * x + y * y);
             if (distance > joystickMaxRadius) {
                 const angle = Math.atan2(y, x);
@@ -1117,11 +1175,26 @@
 
         const handleJoystickMove = (e) => {
             if (!joystickActive || !isTouchDevice()) return;
+            
+            // For touchmove, ensure we're tracking the correct touch
+            let touch = null;
+            if (e.touches) {
+                for (let i = 0; i < e.touches.length; i++) {
+                    if (e.touches[i].identifier === joystickTouchIdentifier) {
+                        touch = e.touches[i];
+                        break;
+                    }
+                }
+                if (!touch) return; // Not the touch we're tracking
+            }
+
             e.preventDefault();
 
-            const pos = getTouchPos(e);
-            let x = pos.x;
-            let y = pos.y;
+            const baseRect = joystickBase.getBoundingClientRect();
+            const currentPos = getTouchOrMousePos(e);
+            
+            let x = currentPos.clientX - baseRect.left - baseRect.width / 2;
+            let y = currentPos.clientY - baseRect.top - baseRect.height / 2;
 
             const distance = Math.sqrt(x * x + y * y);
 
@@ -1138,7 +1211,21 @@
 
         const handleJoystickEnd = (e) => {
             if (!joystickActive || !isTouchDevice()) return;
+
+            // For touchend/touchcancel, ensure we're ending the correct touch
+            let touchEnded = false;
+            if (e.changedTouches) {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === joystickTouchIdentifier) {
+                        touchEnded = true;
+                        break;
+                    }
+                }
+                if (!touchEnded) return; // Not the touch we're tracking that ended
+            }
+
             joystickActive = false;
+            joystickTouchIdentifier = null;
             joystickThumb.classList.remove('active'); // Remove active class
             joystickThumb.style.transition = 'transform 0.1s ease-out'; // Re-enable transition
             joystickThumb.style.transform = 'translate(0, 0)'; // Reset thumb to center
@@ -1150,36 +1237,45 @@
         const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
         const moveEvent = 'ontouchmove' in window ? 'touchmove' : 'mousemove';
         const endEvent = 'ontouchend' in window ? 'touchend' : 'mouseup';
+        const cancelEvent = 'ontouchcancel' in window ? 'touchcancel' : 'mouseleave'; // For touch cancel or mouse leaving element
 
         joystickBase.addEventListener(startEvent, handleJoystickStart, { passive: false });
         document.addEventListener(moveEvent, handleJoystickMove, { passive: false });
         document.addEventListener(endEvent, handleJoystickEnd, { passive: false });
+        document.addEventListener(cancelEvent, handleJoystickEnd, { passive: false }); // Handle touch cancellation
 
         // Shoot button for touch devices
         shootButton.addEventListener(startEvent, (e) => {
-            if (!isTouchDevice()) return;
+            if (!isTouchDevice()) return; // Only for touch devices
             e.preventDefault();
             keys[' '] = true; // Simulate spacebar press
         }, { passive: false });
 
         shootButton.addEventListener(endEvent, (e) => {
-            if (!isTouchDevice()) return;
+            if (!isTouchDevice()) return; // Only for touch devices
             e.preventDefault();
             keys[' '] = false; // Simulate spacebar release
+        });
+        shootButton.addEventListener(cancelEvent, (e) => {
+            if (!isTouchDevice()) return; // Only for touch devices
+            keys[' '] = false; // Release if touch is cancelled/leaves
         });
 
 
         // --- Fullscreen Toggle ---
         function toggleFullscreen() {
+            // Target the entire HTML document for fullscreen
+            const elem = document.documentElement; 
+
             if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
-                if (canvas.requestFullscreen) {
-                    canvas.requestFullscreen();
-                } else if (canvas.mozRequestFullScreen) { 
-                    canvas.mozRequestFullScreen();
-                } else if (canvas.webkitRequestFullscreen) { 
-                    canvas.webkitRequestFullscreen();
-                } else if (canvas.msRequestFullscreen) { 
-                    canvas.msRequestFullscreen();
+                if (elem.requestFullscreen) { 
+                    elem.requestFullscreen();
+                } else if (elem.mozRequestFullScreen) { 
+                    elem.mozRequestFullScreen();
+                } else if (elem.webkitRequestFullscreen) { 
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { 
+                    elem.msRequestFullscreen();
                 }
             } else {
                 if (document.exitFullscreen) {
