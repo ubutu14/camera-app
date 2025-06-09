@@ -492,6 +492,18 @@
                         }
                         break;
 
+                    case 'player_upgraded_health': // NEW: Handle health upgrade notification
+                        const upgradedPlayer = message.id === localPlayer.id ? localPlayer : otherPlayers[message.id];
+                        if (upgradedPlayer) {
+                            const playerName = upgradedPlayer.id;
+                            showNotification(`${playerName} achieved ${message.score} score and gained extra health!`, 'success', 4000);
+                            // Optionally, update the client-side MAX_HEALTH_CLIENT for drawing health bars correctly
+                            // if (message.id === localPlayer.id) {
+                            //     MAX_HEALTH_CLIENT = message.newHealth; // This is a simplification; a proper max health should be communicated/calculated
+                            // }
+                        }
+                        break;
+
                     case 'player_joined': // When *another* player joins, server broadcasts this
                         if (message.player && message.player.id !== localPlayer.id) {
                             if (!otherPlayers[message.player.id]) { // Avoid adding if already present (e.g. from game_state_update)
@@ -555,13 +567,14 @@
                     if (baseColor.startsWith('hsl')) {
                         const parts = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
                         if (parts) {
+                            // Adjust lightness for particle color to make it brighter/darker
                             particleColor = `hsla(${parts[1]}, ${parts[2]}%, ${Math.min(100, parseInt(parts[3]) + 20)}%, ${Math.random()*0.5 + 0.5})`;
                         }
                     } else if (baseColor.startsWith('rgb')) {
-                         const r = parseInt(baseColor.substring(4, 7));
-                         const g = parseInt(baseColor.substring(8, 11));
-                         const b = parseInt(baseColor.substring(12, 15));
-                         particleColor = `rgba(${r + Math.floor(Math.random()*50)}, ${g + Math.floor(Math.random()*50)}, ${b + Math.floor(Math.random()*50)}, ${Math.random()*0.5 + 0.5})`;
+                         const r = parseInt(baseColor.substring(4, baseColor.indexOf(',')));
+                         const g = parseInt(baseColor.substring(baseColor.indexOf(',') + 2, baseColor.lastIndexOf(',')));
+                         const b = parseInt(baseColor.substring(baseColor.lastIndexOf(',') + 2, baseColor.indexOf(')')));
+                         particleColor = `rgba(${Math.min(255, r + Math.floor(Math.random()*50))}, ${Math.min(255, g + Math.floor(Math.random()*50))}, ${Math.min(255, b + Math.floor(Math.random()*50))}, ${Math.random()*0.5 + 0.5})`;
                     }
                 } catch(e) { /* use default baseColor */ }
                 particles.push(new Particle(x, y, particleColor, size, speedX, speedY, life));
@@ -727,8 +740,10 @@
                 // Health bar
                 ctx.fillStyle = '#555'; // Background
                 ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
-                ctx.fillStyle = player.health > 30 ? 'limegreen' : 'red';
-                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * Math.max(0, player.health / MAX_HEALTH_CLIENT), 6);
+                // Dynamically adjust health bar color based on a percentage of current max health
+                const currentMaxHealthForPlayer = player.health > MAX_HEALTH_CLIENT ? player.health : MAX_HEALTH_CLIENT; // If player health exceeds initial max, use current health as the new max for drawing
+                ctx.fillStyle = (player.health / currentMaxHealthForPlayer) > 0.3 ? 'limegreen' : 'red';
+                ctx.fillRect(player.x - PLAYER_RADIUS, player.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * Math.max(0, player.health / currentMaxHealthForPlayer), 6);
 
                 // Name and Score
                 ctx.fillStyle = 'white';
@@ -758,8 +773,10 @@
             // Local player health bar
             ctx.fillStyle = '#555';
             ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2, 6);
-            ctx.fillStyle = localPlayer.health > 30 ? 'limegreen' : 'red';
-            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * Math.max(0, localPlayer.health / MAX_HEALTH_CLIENT), 6);
+            // Dynamically adjust health bar color based on a percentage of current max health
+            const currentMaxHealthForLocalPlayer = localPlayer.health > MAX_HEALTH_CLIENT ? localPlayer.health : MAX_HEALTH_CLIENT; // If local player health exceeds initial max, use current health as the new max for drawing
+            ctx.fillStyle = (localPlayer.health / currentMaxHealthForLocalPlayer) > 0.3 ? 'limegreen' : 'red';
+            ctx.fillRect(localPlayer.x - PLAYER_RADIUS, localPlayer.y - PLAYER_RADIUS - 12, PLAYER_RADIUS * 2 * Math.max(0, localPlayer.health / currentMaxHealthForLocalPlayer), 6);
 
             // Local player name and score
             ctx.fillStyle = 'white';
