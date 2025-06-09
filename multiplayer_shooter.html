@@ -290,7 +290,7 @@
             y: canvas.height / 2,
             color: `hsl(${Math.random() * 360}, 70%, 60%)`,
             health: INITIAL_MAX_HEALTH_CLIENT,
-            maxHealth: INITIAL_MAX_HEALTH_CLIENT, // NEW: Initialize local player's max health
+            maxHealth: INITIAL_MAX_HEALTH_CLIENT, // Initialize local player's max health
             score: 0,
             lastShotTime: 0,
             shootCooldown: 200, // ms
@@ -420,13 +420,13 @@
                                     // createImpactParticles(localPlayer.x, localPlayer.y, localPlayer.color); // Also by 'player_hit'
                                 }
                                 // Check for respawn (health went from <=0 to new max health)
-                                if (localPlayer.health <=0 && serverLocalData.health === serverLocalData.maxHealth) { // Check against serverLocalData.maxHealth
+                                if (localPlayer.health <=0 && serverLocalData.health === serverLocalData.maxHealth) { 
                                     showNotification('You respawned!', 'success');
                                 }
                                 localPlayer.health = serverLocalData.health;
                             }
                             localPlayer.score = serverLocalData.score;
-                            localPlayer.maxHealth = serverLocalData.maxHealth; // NEW: Update local player's max health from server
+                            localPlayer.maxHealth = serverLocalData.maxHealth; // Update local player's max health from server
                         }
 
                         // --- Update Other Players ---
@@ -452,7 +452,7 @@
                                     }
                                 }
                                 // Check for respawn for other players
-                                if (newOtherPlayers[id]._prevHealth <=0 && newOtherPlayers[id].health === newOtherPlayers[id].maxHealth) { // Check against newOtherPlayers[id].maxHealth
+                                if (newOtherPlayers[id]._prevHealth <=0 && newOtherPlayers[id].health === newOtherPlayers[id].maxHealth) {
                                     showNotification(`${newOtherPlayers[id].id} respawned!`, 'info');
                                     newOtherPlayers[id].hitFlashTimer = 0; // Reset flash on respawn
                                 }
