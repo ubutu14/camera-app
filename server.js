@@ -224,7 +224,7 @@ setInterval(() => {
 }, GAME_TICK_RATE); // Run game logic at a fixed rate
 
 // Use the port provided by the environment, or default to 8080 for local development
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 1234;
 server.listen(PORT, '0.0.0.0', () => { // Listen on all available network interfaces
     console.log(`Game server listening on port ${PORT}`);
 });
