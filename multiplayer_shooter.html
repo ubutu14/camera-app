@@ -40,7 +40,6 @@
             -ms-user-select: none;
             user-select: none;
             touch-action: manipulation;
-            /* overflow: hidden;  This was removed to allow scrolling */
         }
 
         h1 {
@@ -190,7 +189,7 @@
 
         /* Mobile Controls - Hidden by default, shown by JS */
         .mobile-controls-container {
-            display: none; /* NEW: Hidden by default */
+            display: none; /* Hidden by default */
             justify-content: space-between;
             align-items: flex-end;
             width: 100%;
@@ -532,7 +531,7 @@
         const openSettingsButton = document.getElementById('openSettingsButton'); 
         const closeSettingsButton = document.getElementById('closeSettingsButton'); 
         const playerScoresList = document.getElementById('playerScoresList'); 
-        const mobileControlsContainer = document.querySelector('.mobile-controls-container'); // NEW: Get reference to mobile controls
+        const mobileControlsContainer = document.querySelector('.mobile-controls-container'); // Get reference to mobile controls
 
         const moveUpButton = document.getElementById('moveUp');
         const moveDownButton = document.getElementById('moveDown');
@@ -1041,17 +1040,17 @@
             });
         }
 
-        // NEW: Function to detect if the device is a touch device
+        // Function to detect if the device is a touch device (more robust)
         function isTouchDevice() {
             return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0) || window.matchMedia('(pointer: coarse)').matches;
         }
 
-        // NEW: Function to update the visibility of mobile controls
+        // Function to update the visibility of mobile controls
         function updateMobileControlsVisibility() {
-            if (isTouchDevice() && document.fullscreenElement) {
-                mobileControlsContainer.style.display = 'flex'; 
+            if (isTouchDevice()) {
+                mobileControlsContainer.style.display = 'flex'; // Show if it's a touch device
             } else {
-                mobileControlsContainer.style.display = 'none';
+                mobileControlsContainer.style.display = 'none'; // Hide if not a touch device
             }
         }
 
@@ -1129,8 +1128,10 @@
             } else {
                 fullscreenButton.textContent = 'Toggle Fullscreen';
             }
-            updateMobileControlsVisibility(); // NEW: Also update mobile controls visibility on fullscreen change
+            // No need to call updateMobileControlsVisibility here based on fullscreen, 
+            // as it will always be shown on touch devices now.
         }
+        // Listener for fullscreen changes (only to update button text now)
         ['fullscreenchange', 'mozfullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(event => {
             document.addEventListener(event, updateFullscreenButtonText, false);
         });
@@ -1198,7 +1199,7 @@
             }
         });
 
-        // NEW: Call on DOMContentLoaded to set initial visibility
+        // Call on DOMContentLoaded to set initial visibility based ONLY on touch device detection
         document.addEventListener('DOMContentLoaded', updateMobileControlsVisibility);
 
         // --- Prevent Page Refresh/Leaving (Optional) ---
