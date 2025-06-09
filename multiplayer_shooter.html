@@ -190,8 +190,11 @@
         /* Mobile Controls - Hidden by default, shown by JS */
         .mobile-controls-container {
             display: none; /* Hidden by default */
-            justify-content: space-between;
-            align-items: flex-end;
+            /* NEW: Adjustments for PS5-like grouping */
+            justify-content: center; /* Center the two control groups */
+            align-items: center; /* Vertically center them */
+            gap: 80px; /* Space between D-pad and action buttons */
+            
             width: 100%;
             max-width: 800px;
             margin-top: 20px;
@@ -238,7 +241,7 @@
             display: flex;
             flex-direction: column;
             gap: 20px; /* Increased gap */
-            margin-right: 20px;
+            margin-right: 0; /* No external margin needed when centered */
         }
         .action-buttons button {
             background: linear-gradient(180deg, var(--secondary-color) 0%, #1e7e34 100%); /* Green for shoot */
@@ -246,7 +249,8 @@
             padding: 25px 35px; /* Larger padding */
             border: none;
             border-radius: 50%;
-            font-size: 1.8em; /* Larger font */
+            /* NEW: Adjust font size for 'X' symbol */
+            font-size: 2.5em; /* Larger font for X symbol */
             width: 100px; /* Larger button */
             height: 100px;
             display: flex;
@@ -436,10 +440,14 @@
         @media (max-width: 768px) {
             h1 { font-size: 2em; }
             canvas { width: 100%; height: auto; } /* Allow canvas to scale */
-            .mobile-controls-container { flex-direction: column; align-items: center; }
-            .d-pad { margin-bottom: 20px; }
+            .mobile-controls-container { 
+                flex-direction: column; /* Stack controls vertically on small screens */
+                align-items: center; 
+                gap: 30px; /* Smaller gap when stacked */
+            }
+            .d-pad { margin-bottom: 0; } /* Remove extra margin when stacked */
             .action-buttons { margin-right: 0; }
-            .action-buttons button { width: 80px; height: 80px; font-size: 1.3em; padding: 15px; }
+            .action-buttons button { width: 80px; height: 80px; font-size: 1.8em; padding: 15px; } /* Adjust font size for smaller mobile button */
             #scoreboard { top: 10px; left: 10px; width: 180px; }
             #notification-area { top: 10px; right: 10px; width: 220px; }
             .panel { padding: 15px; }
@@ -469,7 +477,6 @@
         <canvas id="gameCanvas" width="800" height="600"></canvas>
     
         <!-- Mobile Controls -->
-        <!-- NEW: This container's display will be controlled by JavaScript -->
         <div class="mobile-controls-container">
             <div class="d-pad">
                 <button id="moveUp" class="up">↑</button>
@@ -479,7 +486,7 @@
                 <button id="moveDown" class="down">↓</button>
             </div>
             <div class="action-buttons">
-                <button id="shootButton">SHOOT</button>
+                <button id="shootButton">X</button> <!-- Changed SHOOT to X -->
             </div>
         </div>
     
@@ -489,7 +496,7 @@
             <p>A **real multiplayer game** requires a dedicated **server** to manage game logic, player synchronization, and communication between all clients.</p>
             <p class="controls-info"><strong>Controls:</strong>
                 <br>Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow Keys</kbd> / **On-screen D-Pad**
-                <br>Shoot: <kbd>Spacebar</kbd> / **On-screen SHOOT button**
+                <br>Shoot: <kbd>Spacebar</kbd> / **On-screen <kbd>X</kbd> button** <!-- Updated control hint -->
             </p>
         </div>
     </div>
@@ -531,7 +538,7 @@
         const openSettingsButton = document.getElementById('openSettingsButton'); 
         const closeSettingsButton = document.getElementById('closeSettingsButton'); 
         const playerScoresList = document.getElementById('playerScoresList'); 
-        const mobileControlsContainer = document.querySelector('.mobile-controls-container'); // Get reference to mobile controls
+        const mobileControlsContainer = document.querySelector('.mobile-controls-container'); 
 
         const moveUpButton = document.getElementById('moveUp');
         const moveDownButton = document.getElementById('moveDown');
@@ -1048,9 +1055,9 @@
         // Function to update the visibility of mobile controls
         function updateMobileControlsVisibility() {
             if (isTouchDevice()) {
-                mobileControlsContainer.style.display = 'flex'; // Show if it's a touch device
+                mobileControlsContainer.style.display = 'flex'; 
             } else {
-                mobileControlsContainer.style.display = 'none'; // Hide if not a touch device
+                mobileControlsContainer.style.display = 'none';
             }
         }
 
@@ -1128,10 +1135,7 @@
             } else {
                 fullscreenButton.textContent = 'Toggle Fullscreen';
             }
-            // No need to call updateMobileControlsVisibility here based on fullscreen, 
-            // as it will always be shown on touch devices now.
         }
-        // Listener for fullscreen changes (only to update button text now)
         ['fullscreenchange', 'mozfullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(event => {
             document.addEventListener(event, updateFullscreenButtonText, false);
         });
@@ -1199,7 +1203,6 @@
             }
         });
 
-        // Call on DOMContentLoaded to set initial visibility based ONLY on touch device detection
         document.addEventListener('DOMContentLoaded', updateMobileControlsVisibility);
 
         // --- Prevent Page Refresh/Leaving (Optional) ---
